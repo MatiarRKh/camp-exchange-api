@@ -1,13 +1,51 @@
-# systemd user service: ~/.config/systemd/user/camp-exchange-api.service
+# Системный сервис демо-стенда: /etc/systemd/system/camp-exchange-api.service
+# Работает от отдельного пользователя campapi без sudo; код в /srv принадлежит root
+# и доступен сервису только на чтение. Установка — deploy/install.sh.
 [Unit]
 Description=Camp exchange API (demo)
 After=network-online.target
+Wants=network-online.target
 
 [Service]
-WorkingDirectory=%h/camp-exchange-api
-ExecStart=%h/camp-exchange-api/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers
+User=campapi
+Group=campapi
+WorkingDirectory=/srv/camp-exchange-api
+Environment=PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
+ExecStart=/srv/camp-exchange-api/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --no-server-header
 Restart=always
 RestartSec=3
 
+# Песочница
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+LockPersonality=yes
+RemoveIPC=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged
+SystemCallErrorNumber=EPERM
+UMask=0077
+
+# Лимиты ресурсов
+MemoryMax=400M
+CPUQuota=100%
+TasksMax=64
+
 [Install]
-WantedBy=default.target
+WantedBy=multi-user.target

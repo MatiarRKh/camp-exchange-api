@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import threading
+from collections import deque
 from dataclasses import dataclass
 from datetime import date, datetime
 
@@ -29,6 +30,8 @@ DECLINED = "declined"    # отклонён участником
 EXPIRED = "expired"      # кто-то не ответил за отведённое время
 REJECTED = "rejected"    # отклонён фондом
 ACTIVE_SWAP_STATUSES = {PROPOSED, CONFIRMED}
+
+JOURNAL_LIMIT = 5000
 
 
 @dataclass
@@ -146,8 +149,9 @@ class Store:
         self.requests: dict[str, ExchangeRequest] = {}
         self.swaps: dict[int, Swap] = {}
         self.banned: set[frozenset[tuple[str, int]]] = set()
-        self.notifications: list[Notification] = []
-        self.audit: list[AuditEntry] = []
+        # Журналы ограничены: публичный демо-стенд не должен разрастаться в памяти от потока запросов.
+        self.notifications: deque[Notification] = deque(maxlen=JOURNAL_LIMIT)
+        self.audit: deque[AuditEntry] = deque(maxlen=JOURNAL_LIMIT)
         self._swap_seq = 0
         self._notification_seq = 0
 
