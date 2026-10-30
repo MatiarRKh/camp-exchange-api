@@ -1,0 +1,179 @@
+@startuml er
+title Схема базы данных (ER, нотация Crow's Foot)
+skinparam defaultFontName "Segoe UI"
+skinparam shadowing false
+skinparam linetype ortho
+hide circle
+skinparam class {
+  BackgroundColor #F4F8FC
+  BorderColor #3C7FC0
+  ArrowColor #555555
+}
+skinparam package {
+  BorderColor #8A8A8A
+  FontColor #333333
+}
+
+package "Схема api — владелец API-сервис" {
+  entity season {
+    * id : bigint <<PK>>
+    --
+    * title : text
+    * exchange_opens_at : timestamptz
+    * exchange_closes_at : timestamptz
+  }
+
+  entity camp {
+    * id : bigint <<PK>>
+    --
+    * season_id : bigint <<FK>>
+    * name : text
+    * region : text
+    * start_date : date
+    * end_date : date
+  }
+
+  entity participant {
+    * id : uuid <<PK>>
+    --
+    * season_id : bigint <<FK>>
+    * camp_id : bigint <<FK>> — текущий лагерь
+    * full_name : text
+    * email : text <<UQ в сезоне>>
+    vk_id : text
+    city : text
+    university : text
+    birth_date : date
+    pd_consent_at : timestamptz
+    arrived_by_swap_id : bigint <<FK>>
+  }
+
+  entity staff_user {
+    * id : uuid <<PK>>
+    --
+    * full_name : text
+    * email : text <<UQ>>
+    * role : enum(camp_leader, coordinator,\ncurator, approver)
+  }
+
+  entity staff_camp {
+    * staff_id : uuid <<PK, FK>>
+    * camp_id : bigint <<PK, FK>>
+  }
+
+  entity auth_code {
+    * id : bigint <<PK>>
+    --
+    * email : text
+    * code_hash : text
+    * expires_at : timestamptz — +10 мин
+    * attempts : smallint
+    used_at : timestamptz
+  }
+
+  entity exchange_request {
+    * id : bigint <<PK>>
+    --
+    * participant_id : uuid <<FK>>
+    * status : enum(active, in_swap,\nfulfilled, withdrawn)
+    * version : int
+    * created_at : timestamptz
+    * updated_at : timestamptz
+  }
+
+  entity request_wish {
+    * request_id : bigint <<PK, FK>>
+    * rank : smallint <<PK>> — 1..5
+    --
+    * camp_id : bigint <<FK>>
+  }
+
+  entity swap {
+    * id : bigint <<PK>>
+    --
+    * season_id : bigint <<FK>>
+    * source : enum(auto, manual)
+    * status : enum(proposed, confirmed, approved,\ndeclined, expired, rejected)
+    * combination_key : text
+    * created_at : timestamptz
+    * expires_at : timestamptz
+    created_by : uuid <<FK>>
+    matching_run_id : bigint
+    decided_by : uuid <<FK>>
+    decided_at : timestamptz
+    decision_comment : text
+  }
+
+  entity swap_member {
+    * swap_id : bigint <<PK, FK>>
+    * participant_id : uuid <<PK, FK>>
+    --
+    * from_camp_id : bigint <<FK>>
+    * to_camp_id : bigint <<FK>>
+    wish_rank : smallint
+    * response : enum(pending, accepted, declined)
+    responded_at : timestamptz
+  }
+
+  entity banned_combination {
+    * combination_key : text <<PK>>
+    --
+    * swap_id : bigint <<FK>>
+    * created_at : timestamptz
+  }
+
+  entity audit_log {
+    * id : bigint <<PK>>
+    --
+    * at : timestamptz
+    * actor_id : uuid
+    * action : text
+    swap_id : bigint <<FK>>
+    payload : jsonb
+  }
+}
+
+package "Схема matching — владелец сервис подбора" {
+  entity matching_run {
+    * id : bigint <<PK>>
+    --
+    * trigger : text
+    * started_at : timestamptz
+    finished_at : timestamptz
+    * snapshot_version : bigint
+    * active_requests : int
+    * cycles_found : int
+    * candidates_published : int
+  }
+}
+
+package "Схема notifications — владелец сервис уведомлений" {
+  entity notification {
+    * id : bigint <<PK>>
+    --
+    * recipient_id : uuid
+    * channel : enum(vk, email)
+    * event : text
+    * payload : jsonb
+    * status : enum(pending, sent, failed)
+    * attempts : smallint
+    sent_at : timestamptz
+  }
+}
+
+season ||--o{ camp
+season ||--o{ participant
+camp ||--o{ participant
+participant ||--o{ exchange_request
+exchange_request ||--|{ request_wish
+camp ||--o{ request_wish
+staff_user ||--o{ staff_camp
+camp ||--o{ staff_camp
+season ||--o{ swap
+swap ||--|{ swap_member
+participant ||--o{ swap_member
+camp ||--o{ swap_member
+staff_user |o--o{ swap
+swap ||--o| banned_combination
+swap |o--o{ audit_log
+@enduml

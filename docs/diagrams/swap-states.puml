@@ -1,0 +1,49 @@
+@startuml swap-states
+title Жизненный цикл обмена (UML State Machine)
+skinparam defaultFontName "Segoe UI"
+skinparam shadowing false
+skinparam state {
+  BackgroundColor #F4F8FC
+  BorderColor #3C7FC0
+  ArrowColor #555555
+}
+skinparam note {
+  BackgroundColor #FFFBE6
+  BorderColor #C9B458
+}
+
+state "Предложен\n<size:11>proposed</size>" as proposed
+proposed : у каждого участника ответ «нет / согласен / отказ»
+proposed : срок ответа — 48 часов
+
+state "Подтверждён участниками\n<size:11>confirmed</size>" as confirmed
+confirmed : контакты участников открыты
+confirmed : обмен в очереди согласующего
+
+state "Согласован и применён\n<size:11>approved</size>" as approved
+approved : лагеря сменились у всех участников
+approved : заявки закрыты (fulfilled)
+
+state "Отклонён участником\n<size:11>declined</size>" as declined
+state "Истёк\n<size:11>expired</size>" as expired
+state "Отклонён фондом\n<size:11>rejected</size>" as rejected
+
+[*] --> proposed : сервис подбора нашёл цикл\n/ участник оформил договорённый обмен
+proposed --> proposed : участник согласился\n[ответили не все]
+proposed --> confirmed : участник согласился\n[согласны все]\n/ открыть контакты, уведомить фонд
+proposed --> declined : участник отказался
+proposed --> expired : обработчик по расписанию\n[прошло 48 часов]
+confirmed --> approved : согласующий одобрил\n[распределение не менялось]\n/ сменить лагеря одной транзакцией,\nуведомить команды лагерей
+confirmed --> rejected : согласующий отклонил\n[есть комментарий]
+
+approved --> [*]
+declined --> [*]
+expired --> [*]
+rejected --> [*]
+
+note bottom of declined
+  При любом неудачном исходе заявки всех
+  участников снова активны и участвуют в подборе,
+  а эта комбинация «кто → куда» больше не предлагается.
+end note
+@enduml

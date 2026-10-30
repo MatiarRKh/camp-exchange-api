@@ -8,6 +8,7 @@ from typing import Annotated
 
 from fastapi import Body, Depends, FastAPI, Header, HTTPException, Path, Query, Request, Response
 from fastapi.concurrency import run_in_threadpool
+from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from . import schemas, services
@@ -98,8 +99,26 @@ app = FastAPI(
     description=DESCRIPTION,
     openapi_tags=TAGS,
     lifespan=lifespan,
+    generate_unique_id_function=lambda route: route.name,
     swagger_ui_parameters={"tryItOutEnabled": True, "displayRequestDuration": True, "docExpansion": "list"},
 )
+
+
+def openapi_in_russian() -> dict:
+    """Стандартные подписи FastAPI к ответам — по-русски, как и остальная спецификация."""
+    if app.openapi_schema is None:
+        schema = get_openapi(title=app.title, version=app.version, description=app.description,
+                             routes=app.routes, tags=app.openapi_tags)
+        labels = {"Successful Response": "Успешный ответ", "Validation Error": "Ошибка валидации запроса"}
+        for operations in schema["paths"].values():
+            for operation in operations.values():
+                for response in operation.get("responses", {}).values():
+                    response["description"] = labels.get(response["description"], response["description"])
+        app.openapi_schema = schema
+    return app.openapi_schema
+
+
+app.openapi = openapi_in_russian
 
 
 @app.exception_handler(services.DomainError)

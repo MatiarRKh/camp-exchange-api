@@ -13,11 +13,11 @@ info:
     \ кэмп-лидер (Валдайский, Кижи) |\n| `coord1` | Николай Сергеев, координатор (Кижи) |\n\n**Сценарий проверки — обмен по\
     \ цепочке из четырёх человек:**\n1. `PUT /api/v1/me/request` от `p004` с телом `{\"wishes\": [8, 17]}` — Гриша хочет в\
     \ Кижи. Подбор запускается сразу и находит цепочку\n   Кижи → Валдайский → Забайкальский → Пасвик (`active_swap_id` в\
-    \ ответе).\n2. `PATCH /api/v1/swaps/{id}/members/me` с `{\"response\": \"accepted\"}` от `p001`, `p002`, `p003`, `p004`\
-    \ — обмен переходит в `confirmed`.\n3. `POST /api/v1/swaps/{id}/decision` от `approver1` с `{\"decision\": \"approve\"\
-    }` — лагеря меняются у всех четверых сразу.\n4. `GET /api/v1/camps/8/roster` от `leader1` или `coord1` — в Кижи теперь\
-    \ Григорий; `GET /api/v1/me/notifications` — какие уведомления ушли.\n\nОбмен №1 (p005 ↔ p006) с самого начала ждёт ответа\
-    \ участников, обмен №2 (p007 ↔ p008) — решения фонда.\n"
+    \ ответе; после сброса стенда это обмен №14).\n2. `PATCH /api/v1/swaps/{id}/members/me` с `{\"response\": \"accepted\"\
+    }` от `p001`, `p002`, `p003`, `p004` — обмен переходит в `confirmed`.\n3. `POST /api/v1/swaps/{id}/decision` от `approver1`\
+    \ с `{\"decision\": \"approve\"}` — лагеря меняются у всех четверых сразу.\n4. `GET /api/v1/camps/8/roster` от `leader1`\
+    \ или `coord1` — в Кижи теперь Григорий; `GET /api/v1/me/notifications` — какие уведомления ушли.\n\nОбмен №1 (p005 ↔\
+    \ p006) с самого начала ждёт ответа участников, обмен №2 (p007 ↔ p008) — решения фонда.\n"
   version: 1.0.0
 paths:
   /api/v1/camps:
@@ -26,7 +26,7 @@ paths:
       - Лагеря
       summary: Каталог лагерей сезона
       description: 'Лагеря текущего сезона со спросом: сколько участников хотят уйти и сколько — попасть в лагерь.'
-      operationId: list_camps_api_v1_camps_get
+      operationId: list_camps
       parameters:
       - name: q
         in: query
@@ -50,16 +50,16 @@ paths:
         description: Фильтр по региону, точное совпадение
       responses:
         '200':
-          description: Successful Response
+          description: Успешный ответ
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: '#/components/schemas/CampCatalogItem'
-                title: Response List Camps Api V1 Camps Get
+                title: Response List Camps
         '422':
-          description: Validation Error
+          description: Ошибка валидации запроса
           content:
             application/json:
               schema:
@@ -72,7 +72,7 @@ paths:
       description: 'Состав лагеря для команды лагеря и сотрудников фонда. Набор полей зависит от роли:
 
         кэмп-лидеру — контакты для связи с группой, координатору — данные для пропусков.'
-      operationId: camp_roster_api_v1_camps__camp_id__roster_get
+      operationId: camp_roster
       parameters:
       - name: camp_id
         in: path
@@ -125,7 +125,7 @@ paths:
             value: approver1
       responses:
         '200':
-          description: Successful Response
+          description: Успешный ответ
           content:
             application/json:
               schema:
@@ -155,7 +155,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '422':
-          description: Validation Error
+          description: Ошибка валидации запроса
           content:
             application/json:
               schema:
@@ -166,7 +166,7 @@ paths:
       - Участник
       summary: Текущий пользователь
       description: Для участника — лагерь, заявка и активный обмен; для сотрудника — роль и закреплённые лагеря.
-      operationId: get_me_api_v1_me_get
+      operationId: get_me
       parameters:
       - name: X-User-Id
         in: header
@@ -209,7 +209,7 @@ paths:
             value: coord1
       responses:
         '200':
-          description: Successful Response
+          description: Успешный ответ
           content:
             application/json:
               schema:
@@ -239,7 +239,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '422':
-          description: Validation Error
+          description: Ошибка валидации запроса
           content:
             application/json:
               schema:
@@ -254,7 +254,7 @@ paths:
         после сохранения запускается сервис подбора (в полной системе — по событию `offer.changed` из брокера).
 
         Если обмен нашёлся, в ответе будет `status: in_swap` и `active_swap_id`.'
-      operationId: put_request_api_v1_me_request_put
+      operationId: put_request
       parameters:
       - name: X-User-Id
         in: header
@@ -317,7 +317,7 @@ paths:
                   - 54
       responses:
         '200':
-          description: Successful Response
+          description: Успешный ответ
           content:
             application/json:
               schema:
@@ -353,7 +353,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/RequestOut'
         '422':
-          description: Validation Error
+          description: Ошибка валидации запроса
           content:
             application/json:
               schema:
@@ -363,7 +363,7 @@ paths:
       - Участник
       summary: Отозвать заявку
       description: Заявку можно отозвать, пока она не входит в предложенный обмен.
-      operationId: delete_request_api_v1_me_request_delete
+      operationId: delete_request
       parameters:
       - name: X-User-Id
         in: header
@@ -406,7 +406,7 @@ paths:
             value: coord1
       responses:
         '204':
-          description: Successful Response
+          description: Успешный ответ
         '401':
           description: Пользователь не передан или неизвестен
           content:
@@ -432,7 +432,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '422':
-          description: Validation Error
+          description: Ошибка валидации запроса
           content:
             application/json:
               schema:
@@ -443,7 +443,7 @@ paths:
       - Участник
       summary: Мои уведомления
       description: Что сервис уведомлений отправил пользователю во ВКонтакте или на email (в демо — журнал отправки).
-      operationId: my_notifications_api_v1_me_notifications_get
+      operationId: my_notifications
       parameters:
       - name: limit
         in: query
@@ -495,14 +495,14 @@ paths:
             value: coord1
       responses:
         '200':
-          description: Successful Response
+          description: Успешный ответ
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: '#/components/schemas/NotificationOut'
-                title: Response My Notifications Api V1 Me Notifications Get
+                title: Response My Notifications
         '401':
           description: Пользователь не передан или неизвестен
           content:
@@ -528,7 +528,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '422':
-          description: Validation Error
+          description: Ошибка валидации запроса
           content:
             application/json:
               schema:
@@ -539,7 +539,7 @@ paths:
       - Обмены
       summary: Список обменов
       description: Участник видит свои обмены, согласующий — все, кураторы и команды лагерей — обмены своих лагерей.
-      operationId: list_swaps_api_v1_swaps_get
+      operationId: list_swaps
       parameters:
       - name: status
         in: query
@@ -599,14 +599,14 @@ paths:
             value: coord1
       responses:
         '200':
-          description: Successful Response
+          description: Успешный ответ
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: '#/components/schemas/Swap'
-                title: Response List Swaps Api V1 Swaps Get
+                title: Response List Swaps
         '401':
           description: Пользователь не передан или неизвестен
           content:
@@ -632,7 +632,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '422':
-          description: Validation Error
+          description: Ошибка валидации запроса
           content:
             application/json:
               schema:
@@ -646,7 +646,7 @@ paths:
         каждый лагерь отдаётся и получается ровно один раз. Остальные участники получают приглашение
 
         и подтверждают его так же, как найденный автоматически.'
-      operationId: create_manual_swap_api_v1_swaps_post
+      operationId: create_manual_swap
       parameters:
       - name: X-User-Id
         in: header
@@ -704,7 +704,7 @@ paths:
                     to_camp_id: 8
       responses:
         '201':
-          description: Successful Response
+          description: Успешный ответ
           content:
             application/json:
               schema:
@@ -734,7 +734,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '422':
-          description: Validation Error
+          description: Ошибка валидации запроса
           content:
             application/json:
               schema:
@@ -745,7 +745,7 @@ paths:
       - Обмены
       summary: Карточка обмена
       description: Кто куда переходит, каким по счёту желанием это является, ответы участников, срок ответа и журнал действий.
-      operationId: get_swap_api_v1_swaps__swap_id__get
+      operationId: get_swap
       parameters:
       - name: swap_id
         in: path
@@ -796,7 +796,7 @@ paths:
             value: coord1
       responses:
         '200':
-          description: Successful Response
+          description: Успешный ответ
           content:
             application/json:
               schema:
@@ -826,7 +826,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '422':
-          description: Validation Error
+          description: Ошибка валидации запроса
           content:
             application/json:
               schema:
@@ -841,7 +841,7 @@ paths:
         а обмен попадает в очередь фонда. Отказ одного отменяет обмен для всех: остальные возвращаются
 
         в подбор, а эта комбинация больше не предлагается.'
-      operationId: respond_to_swap_api_v1_swaps__swap_id__members_me_patch
+      operationId: respond_to_swap
       parameters:
       - name: swap_id
         in: path
@@ -907,7 +907,7 @@ paths:
                   response: declined
       responses:
         '200':
-          description: Successful Response
+          description: Успешный ответ
           content:
             application/json:
               schema:
@@ -937,7 +937,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '422':
-          description: Validation Error
+          description: Ошибка валидации запроса
           content:
             application/json:
               schema:
@@ -952,7 +952,7 @@ paths:
         у всех участников сразу (либо у всех, либо ни у кого), команды затронутых лагерей получают уведомление.
 
         Отклонить без комментария нельзя.'
-      operationId: decide_swap_api_v1_swaps__swap_id__decision_post
+      operationId: decide_swap
       parameters:
       - name: swap_id
         in: path
@@ -1019,7 +1019,7 @@ paths:
                   comment: Билеты уже выкуплены фондом
       responses:
         '200':
-          description: Successful Response
+          description: Успешный ответ
           content:
             application/json:
               schema:
@@ -1060,7 +1060,7 @@ paths:
       - Фонд
       summary: Выгрузка согласованных обменов
       description: 'Таблица для подготовки документов: кто, из какого лагеря, в какой, когда согласовано.'
-      operationId: export_approved_api_v1_exports_approved_swaps_csv_get
+      operationId: export_approved
       parameters:
       - name: X-User-Id
         in: header
@@ -1131,7 +1131,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '422':
-          description: Validation Error
+          description: Ошибка валидации запроса
           content:
             application/json:
               schema:
@@ -1144,7 +1144,7 @@ paths:
       description: 'Тот же обработчик, что работает по расписанию: снимает просроченные предложения,
 
         строит граф желаний, ищет циклы из 2–4 участников и создаёт предложения.'
-      operationId: run_matching_api_v1_matching_runs_post
+      operationId: run_matching
       parameters:
       - name: X-User-Id
         in: header
@@ -1187,7 +1187,7 @@ paths:
             value: coord1
       responses:
         '200':
-          description: Successful Response
+          description: Успешный ответ
           content:
             application/json:
               schema:
@@ -1217,7 +1217,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '422':
-          description: Validation Error
+          description: Ошибка валидации запроса
           content:
             application/json:
               schema:
@@ -1228,10 +1228,10 @@ paths:
       - Демо
       summary: Сбросить демо-данные
       description: Возвращает стенд в исходное состояние, чтобы пройти сценарий проверки заново.
-      operationId: reset_demo_api_v1_demo_reset_post
+      operationId: reset_demo
       responses:
         '204':
-          description: Successful Response
+          description: Успешный ответ
 components:
   schemas:
     Camp:

@@ -1,0 +1,72 @@
+@startuml swap-sequence
+title Обмен по цепочке: от заявки до согласования (UML Sequence)
+skinparam defaultFontName "Segoe UI"
+skinparam shadowing false
+skinparam responseMessageBelowArrow true
+skinparam sequence {
+  ParticipantBackgroundColor #438DD5
+  ParticipantFontColor #FFFFFF
+  ParticipantBorderColor #3C7FC0
+  ActorBorderColor #08427B
+  LifeLineBorderColor #8A8A8A
+  GroupBorderColor #8A8A8A
+}
+autonumber "<b>0."
+
+actor "Участник\n(Григорий)" as P
+actor "Другие участники\nцепочки" as O
+actor "Согласующий\nфонда" as A
+participant "Веб-приложение /\nкабинет" as UI
+participant "API-сервис" as API
+database "PostgreSQL\n(схема api)" as DB
+queue "RabbitMQ" as MQ
+participant "Сервис\nподбора" as M
+participant "Сервис\nуведомлений" as N
+
+== Заявка ==
+P -> UI : выбирает лагеря по приоритету
+UI -> API : PUT /api/v1/me/request {wishes}
+API -> DB : сохранить заявку (status = active)
+API -> MQ : offer.changed
+API --> UI : 200 OK, заявка активна
+
+== Подбор (по событию или по расписанию) ==
+MQ -> M : offer.changed
+M -> API : POST /internal/v1/swaps/expire
+API -> DB : снять предложения старше 48 ч
+M -> API : GET /internal/v1/matching/snapshot
+API --> M : активные заявки, лагеря, стоп-лист, version
+M -> M : граф желаний → циклы 2–4 →\nвыбор набора без общих участников
+M -> MQ : swap.candidates_found {cycles, snapshot_version}
+MQ -> API : swap.candidates_found
+API -> DB : транзакция: заявки всё ещё active? →\nсоздать swap + swap_member, заявки → in_swap
+API -> MQ : swap.proposed
+MQ -> N : swap.proposed
+N -> P : ВКонтакте / email: «вы переходите в Кижи»
+N -> O : ВКонтакте / email: схема «кто → куда»
+
+== Подтверждение участниками ==
+P -> UI : «Согласен»
+UI -> API : PATCH /api/v1/swaps/{id}/members/me {accepted}
+API -> DB : ответ участника
+O -> API : PATCH … {accepted} (каждый)
+API -> DB : все согласны → status = confirmed
+API -> MQ : swap.confirmed
+MQ -> N : swap.confirmed
+N -> P : контакты участников цепочки
+N -> A : новый обмен в очереди
+
+== Согласование фондом ==
+A -> UI : открывает очередь
+UI -> API : GET /api/v1/swaps?status=confirmed
+API --> UI : обмены с городами участников и регионами лагерей
+A -> UI : «Согласовать»
+UI -> API : POST /api/v1/swaps/{id}/decision {approve}
+API -> DB : транзакция: сменить лагеря всех участников,\nзаявки → fulfilled, swap → approved, журнал
+API -> MQ : swap.approved
+API --> UI : 200 OK
+MQ -> N : swap.approved
+N -> P : «обмен согласован, ваш лагерь — Кижи»
+N -> O : то же — каждому
+note over N : кэмп-лидеры и координаторы\nзатронутых лагерей тоже получают\nуведомление о новом составе
+@enduml

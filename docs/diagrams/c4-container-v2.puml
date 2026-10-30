@@ -1,0 +1,55 @@
+@startuml c4-container-v2
+!include <C4/C4_Container>
+skinparam defaultFontName "Segoe UI"
+LAYOUT_TOP_DOWN()
+title Биржа обмена лагерями — диаграмма контейнеров C4 (версия 2, по итогам рецензии)
+
+Person(participant, "Участник-волонтёр", "Студент — победитель конкурса, ищет обмен лагерем")
+Person(leader, "Кэмп-лидер", "По договору с фондом ведёт группу волонтёров в лагере")
+Person(coord, "Координатор заповедной территории", "Сотрудник заповедника: пропуска и размещение")
+Person(curator, "Куратор фонда", "Ведёт группу лагерей, готовит сезон")
+Person(approver, "Согласующий фонда", "Финансы, согласование обменов")
+
+System_Boundary(sys, "Биржа обмена лагерями") {
+  Container(webapp, "Веб-приложение участника", "React, TypeScript", "Каталог лагерей, заявка, страница обмена с подтверждением")
+  Container(cabinet, "Кабинет фонда и лагерей", "React, TypeScript", "Экраны по ролям: составы лагерей, очередь согласования, сводка, импорт сезона")
+  Container(api, "API-сервис", "Python, FastAPI", "REST API, вход по коду, ролевой доступ, правила заявок и обменов; единственный, кто пишет в схему api")
+  ContainerDb(db, "База данных", "PostgreSQL", "Схемы api, matching, notifications — у каждой схемы один сервис-владелец")
+  ContainerQueue(mq, "Брокер сообщений", "RabbitMQ", "События заявок и обменов; отдельная приоритетная очередь кодов входа")
+  Container(matcher, "Сервис подбора обменов", "Python", "Таймер раз в 10 мин и события из брокера → поиск циклов 2–4 → кандидаты в обмены")
+  Container(notifier, "Сервис уведомлений", "Python", "Рассылает сообщения сообщества фонда во ВКонтакте и письма; повторяет при сбое")
+}
+
+System_Ext(vk, "VK API", "Сообщения от сообщества фонда")
+System_Ext(smtp, "Почтовый сервис", "SMTP")
+
+Rel(participant, webapp, "Заявка, ответ на обмен", "HTTPS")
+Rel(leader, cabinet, "Состав лагеря, контакты группы", "HTTPS")
+Rel(coord, cabinet, "Состав лагеря для пропусков", "HTTPS")
+Rel(curator, cabinet, "Сводка, импорт сезона", "HTTPS")
+Rel(approver, cabinet, "Очередь согласования", "HTTPS")
+
+Rel(webapp, api, "REST", "HTTPS/JSON")
+Rel(cabinet, api, "REST", "HTTPS/JSON")
+Rel(api, db, "Читает и пишет схему api", "SQL")
+Rel(api, mq, "offer.changed, swap.proposed / confirmed / approved / closed, auth.code_requested", "AMQP")
+Rel(mq, api, "swap.candidates_found", "AMQP")
+
+Rel(mq, matcher, "offer.changed, swap.closed — запуск подбора", "AMQP")
+Rel(matcher, mq, "swap.candidates_found", "AMQP")
+Rel(matcher, api, "Снимок заявок, снятие просроченных", "HTTPS, внутренний API")
+Rel(matcher, db, "Журнал запусков (схема matching)", "SQL")
+
+Rel(mq, notifier, "События для рассылки", "AMQP")
+Rel(notifier, db, "Очередь и статусы отправки (схема notifications)", "SQL")
+Rel_D(notifier, vk, "Сообщения", "HTTPS")
+Rel_D(notifier, smtp, "Письма и коды входа (код действует 10 мин)", "SMTP")
+
+Rel_U(vk, participant, "Предложения, решения фонда")
+Rel_U(smtp, participant, "Коды входа, предложения")
+Rel_U(smtp, leader, "Изменения состава")
+Rel_U(smtp, coord, "Изменения состава")
+Rel_U(smtp, approver, "Новые обмены в очереди")
+
+SHOW_LEGEND()
+@enduml
