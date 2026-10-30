@@ -1,0 +1,1841 @@
+openapi: 3.1.0
+info:
+  title: Биржа обмена лагерями — API
+  description: "\nДемо-версия API-сервиса **биржи обмена лагерями** для участников Школы Фонда Потанина\n(учебный проект НИУ\
+    \ ВШЭ, не официальный сервис фонда).\n\nЛагеря — настоящий список сезона 2026 (даты перенесены на 2027 год), участники\
+    \ и сотрудники вымышленные.\nДанные хранятся в памяти; `POST /api/v1/demo/reset` возвращает их в исходное состояние.\n\
+    \n**Авторизация (заглушка).** В полной системе пользователь входит по одноразовому коду и получает токен.\nЗдесь пользователь\
+    \ передаётся заголовком `X-User-Id` — в каждом запросе его можно выбрать из списка:\n\n| X-User-Id | Кто это |\n|---|---|\n\
+    | `p004` | Григорий Павлов, участник (Пасвик), заявки ещё нет |\n| `p001` | Анна Лебедева, участница (Кижи) |\n| `p002`\
+    \ | Борис Ковалёв, участник (Валдайский) |\n| `p003` | Виктория Зайцева, участница (Забайкальский) |\n| `p005` | Дмитрий\
+    \ Соколов, участник (Красноярские Столбы) |\n| `p006` | Евгения Морозова, участница (Земля леопарда) |\n| `approver1`\
+    \ | Марина Волкова, согласующий фонда |\n| `curator1` | Олег Тарасов, куратор лагерей 1–31 |\n| `leader1` | Дарья Кузнецова,\
+    \ кэмп-лидер (Валдайский, Кижи) |\n| `coord1` | Николай Сергеев, координатор (Кижи) |\n\n**Сценарий проверки — обмен по\
+    \ цепочке из четырёх человек:**\n1. `PUT /api/v1/me/request` от `p004` с телом `{\"wishes\": [8, 17]}` — Гриша хочет в\
+    \ Кижи. Подбор запускается сразу и находит цепочку\n   Кижи → Валдайский → Забайкальский → Пасвик (`active_swap_id` в\
+    \ ответе).\n2. `PATCH /api/v1/swaps/{id}/members/me` с `{\"response\": \"accepted\"}` от `p001`, `p002`, `p003`, `p004`\
+    \ — обмен переходит в `confirmed`.\n3. `POST /api/v1/swaps/{id}/decision` от `approver1` с `{\"decision\": \"approve\"\
+    }` — лагеря меняются у всех четверых сразу.\n4. `GET /api/v1/camps/8/roster` от `leader1` или `coord1` — в Кижи теперь\
+    \ Григорий; `GET /api/v1/me/notifications` — какие уведомления ушли.\n\nОбмен №1 (p005 ↔ p006) с самого начала ждёт ответа\
+    \ участников, обмен №2 (p007 ↔ p008) — решения фонда.\n"
+  version: 1.0.0
+paths:
+  /api/v1/camps:
+    get:
+      tags:
+      - Лагеря
+      summary: Каталог лагерей сезона
+      description: 'Лагеря текущего сезона со спросом: сколько участников хотят уйти и сколько — попасть в лагерь.'
+      operationId: list_camps_api_v1_camps_get
+      parameters:
+      - name: q
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Поиск по названию
+          title: Q
+        description: Поиск по названию
+      - name: region
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Фильтр по региону, точное совпадение
+          title: Region
+        description: Фильтр по региону, точное совпадение
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CampCatalogItem'
+                title: Response List Camps Api V1 Camps Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/camps/{camp_id}/roster:
+    get:
+      tags:
+      - Лагеря
+      summary: Актуальный состав лагеря
+      description: 'Состав лагеря для команды лагеря и сотрудников фонда. Набор полей зависит от роли:
+
+        кэмп-лидеру — контакты для связи с группой, координатору — данные для пропусков.'
+      operationId: camp_roster_api_v1_camps__camp_id__roster_get
+      parameters:
+      - name: camp_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          description: id лагеря
+          examples:
+          - 8
+          title: Camp Id
+        description: id лагеря
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+          description: Демо-пользователь
+          title: X-User-Id
+        description: Демо-пользователь
+        examples:
+          leader1:
+            summary: leader1 — Дарья Кузнецова, кэмп-лидер (Валдайский, Кижи)
+            value: leader1
+          coord1:
+            summary: coord1 — Николай Сергеев, координатор (Кижи)
+            value: coord1
+          curator1:
+            summary: curator1 — Олег Тарасов, куратор лагерей 1–31
+            value: curator1
+          p004:
+            summary: p004 — Григорий Павлов, участник (Пасвик), заявки ещё нет
+            value: p004
+          p001:
+            summary: p001 — Анна Лебедева, участница (Кижи)
+            value: p001
+          p002:
+            summary: p002 — Борис Ковалёв, участник (Валдайский)
+            value: p002
+          p003:
+            summary: p003 — Виктория Зайцева, участница (Забайкальский)
+            value: p003
+          p005:
+            summary: p005 — Дмитрий Соколов, участник (Красноярские Столбы)
+            value: p005
+          p006:
+            summary: p006 — Евгения Морозова, участница (Земля леопарда)
+            value: p006
+          approver1:
+            summary: approver1 — Марина Волкова, согласующий фонда
+            value: approver1
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Roster'
+        '401':
+          description: Пользователь не передан или неизвестен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Объект не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Конфликт с текущим состоянием
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/me:
+    get:
+      tags:
+      - Участник
+      summary: Текущий пользователь
+      description: Для участника — лагерь, заявка и активный обмен; для сотрудника — роль и закреплённые лагеря.
+      operationId: get_me_api_v1_me_get
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+          description: Демо-пользователь
+          title: X-User-Id
+        description: Демо-пользователь
+        examples:
+          p004:
+            summary: p004 — Григорий Павлов, участник (Пасвик), заявки ещё нет
+            value: p004
+          p001:
+            summary: p001 — Анна Лебедева, участница (Кижи)
+            value: p001
+          p002:
+            summary: p002 — Борис Ковалёв, участник (Валдайский)
+            value: p002
+          p003:
+            summary: p003 — Виктория Зайцева, участница (Забайкальский)
+            value: p003
+          p005:
+            summary: p005 — Дмитрий Соколов, участник (Красноярские Столбы)
+            value: p005
+          p006:
+            summary: p006 — Евгения Морозова, участница (Земля леопарда)
+            value: p006
+          approver1:
+            summary: approver1 — Марина Волкова, согласующий фонда
+            value: approver1
+          curator1:
+            summary: curator1 — Олег Тарасов, куратор лагерей 1–31
+            value: curator1
+          leader1:
+            summary: leader1 — Дарья Кузнецова, кэмп-лидер (Валдайский, Кижи)
+            value: leader1
+          coord1:
+            summary: coord1 — Николай Сергеев, координатор (Кижи)
+            value: coord1
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Me'
+        '401':
+          description: Пользователь не передан или неизвестен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Объект не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Конфликт с текущим состоянием
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/me/request:
+    put:
+      tags:
+      - Участник
+      summary: Создать или изменить заявку на обмен
+      description: 'Участник указывает до 5 лагерей по приоритету. Заявка сразу участвует в подборе:
+
+        после сохранения запускается сервис подбора (в полной системе — по событию `offer.changed` из брокера).
+
+        Если обмен нашёлся, в ответе будет `status: in_swap` и `active_swap_id`.'
+      operationId: put_request_api_v1_me_request_put
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+          description: Демо-пользователь
+          title: X-User-Id
+        description: Демо-пользователь
+        examples:
+          p004:
+            summary: p004 — Григорий Павлов, участник (Пасвик), заявки ещё нет
+            value: p004
+          p001:
+            summary: p001 — Анна Лебедева, участница (Кижи)
+            value: p001
+          p002:
+            summary: p002 — Борис Ковалёв, участник (Валдайский)
+            value: p002
+          p003:
+            summary: p003 — Виктория Зайцева, участница (Забайкальский)
+            value: p003
+          p005:
+            summary: p005 — Дмитрий Соколов, участник (Красноярские Столбы)
+            value: p005
+          p006:
+            summary: p006 — Евгения Морозова, участница (Земля леопарда)
+            value: p006
+          approver1:
+            summary: approver1 — Марина Волкова, согласующий фонда
+            value: approver1
+          curator1:
+            summary: curator1 — Олег Тарасов, куратор лагерей 1–31
+            value: curator1
+          leader1:
+            summary: leader1 — Дарья Кузнецова, кэмп-лидер (Валдайский, Кижи)
+            value: leader1
+          coord1:
+            summary: coord1 — Николай Сергеев, координатор (Кижи)
+            value: coord1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestIn'
+            examples:
+              chain:
+                summary: Гриша (p004) хочет в Кижи — замыкает цепочку
+                value:
+                  wishes:
+                  - 8
+                  - 17
+              several:
+                summary: Несколько лагерей по приоритету
+                value:
+                  wishes:
+                  - 12
+                  - 28
+                  - 54
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequestOut'
+        '401':
+          description: Пользователь не передан или неизвестен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Объект не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Конфликт с текущим состоянием
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '201':
+          description: Заявка создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequestOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - Участник
+      summary: Отозвать заявку
+      description: Заявку можно отозвать, пока она не входит в предложенный обмен.
+      operationId: delete_request_api_v1_me_request_delete
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+          description: Демо-пользователь
+          title: X-User-Id
+        description: Демо-пользователь
+        examples:
+          p001:
+            summary: p001 — Анна Лебедева, участница (Кижи)
+            value: p001
+          p004:
+            summary: p004 — Григорий Павлов, участник (Пасвик), заявки ещё нет
+            value: p004
+          p002:
+            summary: p002 — Борис Ковалёв, участник (Валдайский)
+            value: p002
+          p003:
+            summary: p003 — Виктория Зайцева, участница (Забайкальский)
+            value: p003
+          p005:
+            summary: p005 — Дмитрий Соколов, участник (Красноярские Столбы)
+            value: p005
+          p006:
+            summary: p006 — Евгения Морозова, участница (Земля леопарда)
+            value: p006
+          approver1:
+            summary: approver1 — Марина Волкова, согласующий фонда
+            value: approver1
+          curator1:
+            summary: curator1 — Олег Тарасов, куратор лагерей 1–31
+            value: curator1
+          leader1:
+            summary: leader1 — Дарья Кузнецова, кэмп-лидер (Валдайский, Кижи)
+            value: leader1
+          coord1:
+            summary: coord1 — Николай Сергеев, координатор (Кижи)
+            value: coord1
+      responses:
+        '204':
+          description: Successful Response
+        '401':
+          description: Пользователь не передан или неизвестен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Объект не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Конфликт с текущим состоянием
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/me/notifications:
+    get:
+      tags:
+      - Участник
+      summary: Мои уведомления
+      description: Что сервис уведомлений отправил пользователю во ВКонтакте или на email (в демо — журнал отправки).
+      operationId: my_notifications_api_v1_me_notifications_get
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 20
+          title: Limit
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+          description: Демо-пользователь
+          title: X-User-Id
+        description: Демо-пользователь
+        examples:
+          p004:
+            summary: p004 — Григорий Павлов, участник (Пасвик), заявки ещё нет
+            value: p004
+          leader1:
+            summary: leader1 — Дарья Кузнецова, кэмп-лидер (Валдайский, Кижи)
+            value: leader1
+          approver1:
+            summary: approver1 — Марина Волкова, согласующий фонда
+            value: approver1
+          p001:
+            summary: p001 — Анна Лебедева, участница (Кижи)
+            value: p001
+          p002:
+            summary: p002 — Борис Ковалёв, участник (Валдайский)
+            value: p002
+          p003:
+            summary: p003 — Виктория Зайцева, участница (Забайкальский)
+            value: p003
+          p005:
+            summary: p005 — Дмитрий Соколов, участник (Красноярские Столбы)
+            value: p005
+          p006:
+            summary: p006 — Евгения Морозова, участница (Земля леопарда)
+            value: p006
+          curator1:
+            summary: curator1 — Олег Тарасов, куратор лагерей 1–31
+            value: curator1
+          coord1:
+            summary: coord1 — Николай Сергеев, координатор (Кижи)
+            value: coord1
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NotificationOut'
+                title: Response My Notifications Api V1 Me Notifications Get
+        '401':
+          description: Пользователь не передан или неизвестен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Объект не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Конфликт с текущим состоянием
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/swaps:
+    get:
+      tags:
+      - Обмены
+      summary: Список обменов
+      description: Участник видит свои обмены, согласующий — все, кураторы и команды лагерей — обмены своих лагерей.
+      operationId: list_swaps_api_v1_swaps_get
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - enum:
+            - proposed
+            - confirmed
+            - approved
+            - declined
+            - expired
+            - rejected
+            type: string
+          - type: 'null'
+          description: Фильтр по статусу; очередь фонда — confirmed
+          title: Status
+        description: Фильтр по статусу; очередь фонда — confirmed
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+          description: Демо-пользователь
+          title: X-User-Id
+        description: Демо-пользователь
+        examples:
+          approver1:
+            summary: approver1 — Марина Волкова, согласующий фонда
+            value: approver1
+          p001:
+            summary: p001 — Анна Лебедева, участница (Кижи)
+            value: p001
+          curator1:
+            summary: curator1 — Олег Тарасов, куратор лагерей 1–31
+            value: curator1
+          p004:
+            summary: p004 — Григорий Павлов, участник (Пасвик), заявки ещё нет
+            value: p004
+          p002:
+            summary: p002 — Борис Ковалёв, участник (Валдайский)
+            value: p002
+          p003:
+            summary: p003 — Виктория Зайцева, участница (Забайкальский)
+            value: p003
+          p005:
+            summary: p005 — Дмитрий Соколов, участник (Красноярские Столбы)
+            value: p005
+          p006:
+            summary: p006 — Евгения Морозова, участница (Земля леопарда)
+            value: p006
+          leader1:
+            summary: leader1 — Дарья Кузнецова, кэмп-лидер (Валдайский, Кижи)
+            value: leader1
+          coord1:
+            summary: coord1 — Николай Сергеев, координатор (Кижи)
+            value: coord1
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Swap'
+                title: Response List Swaps Api V1 Swaps Get
+        '401':
+          description: Пользователь не передан или неизвестен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Объект не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Конфликт с текущим состоянием
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - Обмены
+      summary: Оформить обмен, о котором участники договорились сами
+      description: 'Инициатор указывает, кто в какой лагерь переходит. Обмен должен быть замкнут:
+
+        каждый лагерь отдаётся и получается ровно один раз. Остальные участники получают приглашение
+
+        и подтверждают его так же, как найденный автоматически.'
+      operationId: create_manual_swap_api_v1_swaps_post
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+          description: Демо-пользователь
+          title: X-User-Id
+        description: Демо-пользователь
+        examples:
+          p001:
+            summary: p001 — Анна Лебедева, участница (Кижи)
+            value: p001
+          p004:
+            summary: p004 — Григорий Павлов, участник (Пасвик), заявки ещё нет
+            value: p004
+          p002:
+            summary: p002 — Борис Ковалёв, участник (Валдайский)
+            value: p002
+          p003:
+            summary: p003 — Виктория Зайцева, участница (Забайкальский)
+            value: p003
+          p005:
+            summary: p005 — Дмитрий Соколов, участник (Красноярские Столбы)
+            value: p005
+          p006:
+            summary: p006 — Евгения Морозова, участница (Земля леопарда)
+            value: p006
+          approver1:
+            summary: approver1 — Марина Волкова, согласующий фонда
+            value: approver1
+          curator1:
+            summary: curator1 — Олег Тарасов, куратор лагерей 1–31
+            value: curator1
+          leader1:
+            summary: leader1 — Дарья Кузнецова, кэмп-лидер (Валдайский, Кижи)
+            value: leader1
+          coord1:
+            summary: coord1 — Николай Сергеев, координатор (Кижи)
+            value: coord1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManualSwapIn'
+            examples:
+              pair:
+                summary: Анна (Кижи) и Борис (Валдайский) меняются
+                value:
+                  members:
+                  - participant_id: p001
+                    to_camp_id: 7
+                  - participant_id: p002
+                    to_camp_id: 8
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Swap'
+        '401':
+          description: Пользователь не передан или неизвестен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Объект не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Конфликт с текущим состоянием
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/swaps/{swap_id}:
+    get:
+      tags:
+      - Обмены
+      summary: Карточка обмена
+      description: Кто куда переходит, каким по счёту желанием это является, ответы участников, срок ответа и журнал действий.
+      operationId: get_swap_api_v1_swaps__swap_id__get
+      parameters:
+      - name: swap_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          examples:
+          - 1
+          title: Swap Id
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+          description: Демо-пользователь
+          title: X-User-Id
+        description: Демо-пользователь
+        examples:
+          p001:
+            summary: p001 — Анна Лебедева, участница (Кижи)
+            value: p001
+          approver1:
+            summary: approver1 — Марина Волкова, согласующий фонда
+            value: approver1
+          p004:
+            summary: p004 — Григорий Павлов, участник (Пасвик), заявки ещё нет
+            value: p004
+          p002:
+            summary: p002 — Борис Ковалёв, участник (Валдайский)
+            value: p002
+          p003:
+            summary: p003 — Виктория Зайцева, участница (Забайкальский)
+            value: p003
+          p005:
+            summary: p005 — Дмитрий Соколов, участник (Красноярские Столбы)
+            value: p005
+          p006:
+            summary: p006 — Евгения Морозова, участница (Земля леопарда)
+            value: p006
+          curator1:
+            summary: curator1 — Олег Тарасов, куратор лагерей 1–31
+            value: curator1
+          leader1:
+            summary: leader1 — Дарья Кузнецова, кэмп-лидер (Валдайский, Кижи)
+            value: leader1
+          coord1:
+            summary: coord1 — Николай Сергеев, координатор (Кижи)
+            value: coord1
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Swap'
+        '401':
+          description: Пользователь не передан или неизвестен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Объект не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Конфликт с текущим состоянием
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/swaps/{swap_id}/members/me:
+    patch:
+      tags:
+      - Обмены
+      summary: Ответить на предложение обмена
+      description: 'Когда согласны все, обмен переходит в `confirmed`, участникам открываются контакты друг друга,
+
+        а обмен попадает в очередь фонда. Отказ одного отменяет обмен для всех: остальные возвращаются
+
+        в подбор, а эта комбинация больше не предлагается.'
+      operationId: respond_to_swap_api_v1_swaps__swap_id__members_me_patch
+      parameters:
+      - name: swap_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          examples:
+          - 1
+          title: Swap Id
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+          description: Демо-пользователь
+          title: X-User-Id
+        description: Демо-пользователь
+        examples:
+          p001:
+            summary: p001 — Анна Лебедева, участница (Кижи)
+            value: p001
+          p002:
+            summary: p002 — Борис Ковалёв, участник (Валдайский)
+            value: p002
+          p003:
+            summary: p003 — Виктория Зайцева, участница (Забайкальский)
+            value: p003
+          p004:
+            summary: p004 — Григорий Павлов, участник (Пасвик), заявки ещё нет
+            value: p004
+          p005:
+            summary: p005 — Дмитрий Соколов, участник (Красноярские Столбы)
+            value: p005
+          p006:
+            summary: p006 — Евгения Морозова, участница (Земля леопарда)
+            value: p006
+          approver1:
+            summary: approver1 — Марина Волкова, согласующий фонда
+            value: approver1
+          curator1:
+            summary: curator1 — Олег Тарасов, куратор лагерей 1–31
+            value: curator1
+          leader1:
+            summary: leader1 — Дарья Кузнецова, кэмп-лидер (Валдайский, Кижи)
+            value: leader1
+          coord1:
+            summary: coord1 — Николай Сергеев, координатор (Кижи)
+            value: coord1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResponseIn'
+            examples:
+              accept:
+                summary: Согласен
+                value:
+                  response: accepted
+              decline:
+                summary: Отказываюсь
+                value:
+                  response: declined
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Swap'
+        '401':
+          description: Пользователь не передан или неизвестен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Объект не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Конфликт с текущим состоянием
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/swaps/{swap_id}/decision:
+    post:
+      tags:
+      - Фонд
+      summary: Согласовать или отклонить обмен
+      description: 'Только для согласующего и только для обменов в статусе `confirmed`. При согласовании лагеря меняются
+
+        у всех участников сразу (либо у всех, либо ни у кого), команды затронутых лагерей получают уведомление.
+
+        Отклонить без комментария нельзя.'
+      operationId: decide_swap_api_v1_swaps__swap_id__decision_post
+      parameters:
+      - name: swap_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          examples:
+          - 2
+          title: Swap Id
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+          description: Демо-пользователь
+          title: X-User-Id
+        description: Демо-пользователь
+        examples:
+          approver1:
+            summary: approver1 — Марина Волкова, согласующий фонда
+            value: approver1
+          p004:
+            summary: p004 — Григорий Павлов, участник (Пасвик), заявки ещё нет
+            value: p004
+          p001:
+            summary: p001 — Анна Лебедева, участница (Кижи)
+            value: p001
+          p002:
+            summary: p002 — Борис Ковалёв, участник (Валдайский)
+            value: p002
+          p003:
+            summary: p003 — Виктория Зайцева, участница (Забайкальский)
+            value: p003
+          p005:
+            summary: p005 — Дмитрий Соколов, участник (Красноярские Столбы)
+            value: p005
+          p006:
+            summary: p006 — Евгения Морозова, участница (Земля леопарда)
+            value: p006
+          curator1:
+            summary: curator1 — Олег Тарасов, куратор лагерей 1–31
+            value: curator1
+          leader1:
+            summary: leader1 — Дарья Кузнецова, кэмп-лидер (Валдайский, Кижи)
+            value: leader1
+          coord1:
+            summary: coord1 — Николай Сергеев, координатор (Кижи)
+            value: coord1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecisionIn'
+            examples:
+              approve:
+                summary: Согласовать
+                value:
+                  decision: approve
+              reject:
+                summary: Отклонить с комментарием
+                value:
+                  decision: reject
+                  comment: Билеты уже выкуплены фондом
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Swap'
+        '401':
+          description: Пользователь не передан или неизвестен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Объект не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Конфликт с текущим состоянием
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Отклонение без комментария
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/exports/approved-swaps.csv:
+    get:
+      tags:
+      - Фонд
+      summary: Выгрузка согласованных обменов
+      description: 'Таблица для подготовки документов: кто, из какого лагеря, в какой, когда согласовано.'
+      operationId: export_approved_api_v1_exports_approved_swaps_csv_get
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+          description: Демо-пользователь
+          title: X-User-Id
+        description: Демо-пользователь
+        examples:
+          approver1:
+            summary: approver1 — Марина Волкова, согласующий фонда
+            value: approver1
+          curator1:
+            summary: curator1 — Олег Тарасов, куратор лагерей 1–31
+            value: curator1
+          p004:
+            summary: p004 — Григорий Павлов, участник (Пасвик), заявки ещё нет
+            value: p004
+          p001:
+            summary: p001 — Анна Лебедева, участница (Кижи)
+            value: p001
+          p002:
+            summary: p002 — Борис Ковалёв, участник (Валдайский)
+            value: p002
+          p003:
+            summary: p003 — Виктория Зайцева, участница (Забайкальский)
+            value: p003
+          p005:
+            summary: p005 — Дмитрий Соколов, участник (Красноярские Столбы)
+            value: p005
+          p006:
+            summary: p006 — Евгения Морозова, участница (Земля леопарда)
+            value: p006
+          leader1:
+            summary: leader1 — Дарья Кузнецова, кэмп-лидер (Валдайский, Кижи)
+            value: leader1
+          coord1:
+            summary: coord1 — Николай Сергеев, координатор (Кижи)
+            value: coord1
+      responses:
+        '200':
+          description: CSV, разделитель «;»
+          content:
+            text/csv: {}
+        '401':
+          description: Пользователь не передан или неизвестен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Объект не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Конфликт с текущим состоянием
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/matching/runs:
+    post:
+      tags:
+      - Фонд
+      summary: Запустить подбор вручную
+      description: 'Тот же обработчик, что работает по расписанию: снимает просроченные предложения,
+
+        строит граф желаний, ищет циклы из 2–4 участников и создаёт предложения.'
+      operationId: run_matching_api_v1_matching_runs_post
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+          description: Демо-пользователь
+          title: X-User-Id
+        description: Демо-пользователь
+        examples:
+          curator1:
+            summary: curator1 — Олег Тарасов, куратор лагерей 1–31
+            value: curator1
+          approver1:
+            summary: approver1 — Марина Волкова, согласующий фонда
+            value: approver1
+          p004:
+            summary: p004 — Григорий Павлов, участник (Пасвик), заявки ещё нет
+            value: p004
+          p001:
+            summary: p001 — Анна Лебедева, участница (Кижи)
+            value: p001
+          p002:
+            summary: p002 — Борис Ковалёв, участник (Валдайский)
+            value: p002
+          p003:
+            summary: p003 — Виктория Зайцева, участница (Забайкальский)
+            value: p003
+          p005:
+            summary: p005 — Дмитрий Соколов, участник (Красноярские Столбы)
+            value: p005
+          p006:
+            summary: p006 — Евгения Морозова, участница (Земля леопарда)
+            value: p006
+          leader1:
+            summary: leader1 — Дарья Кузнецова, кэмп-лидер (Валдайский, Кижи)
+            value: leader1
+          coord1:
+            summary: coord1 — Николай Сергеев, координатор (Кижи)
+            value: coord1
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MatchingRun'
+        '401':
+          description: Пользователь не передан или неизвестен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Объект не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Конфликт с текущим состоянием
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/demo/reset:
+    post:
+      tags:
+      - Демо
+      summary: Сбросить демо-данные
+      description: Возвращает стенд в исходное состояние, чтобы пройти сценарий проверки заново.
+      operationId: reset_demo_api_v1_demo_reset_post
+      responses:
+        '204':
+          description: Successful Response
+components:
+  schemas:
+    Camp:
+      properties:
+        id:
+          type: integer
+          title: Id
+        name:
+          type: string
+          title: Name
+        region:
+          type: string
+          title: Region
+        start_date:
+          type: string
+          format: date
+          title: Start Date
+        end_date:
+          type: string
+          format: date
+          title: End Date
+      type: object
+      required:
+      - id
+      - name
+      - region
+      - start_date
+      - end_date
+      title: Camp
+    CampCatalogItem:
+      properties:
+        id:
+          type: integer
+          title: Id
+        name:
+          type: string
+          title: Name
+        region:
+          type: string
+          title: Region
+        start_date:
+          type: string
+          format: date
+          title: Start Date
+        end_date:
+          type: string
+          format: date
+          title: End Date
+        participants:
+          type: integer
+          title: Participants
+          description: Сколько участников сейчас распределено в лагерь
+        want_to_leave:
+          type: integer
+          title: Want To Leave
+          description: Сколько участников лагеря подали заявку на обмен
+        want_to_join:
+          type: integer
+          title: Want To Join
+          description: В скольких активных заявках лагерь указан среди желаемых
+      type: object
+      required:
+      - id
+      - name
+      - region
+      - start_date
+      - end_date
+      - participants
+      - want_to_leave
+      - want_to_join
+      title: CampCatalogItem
+    Contacts:
+      properties:
+        email:
+          type: string
+          title: Email
+        vk_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Vk Id
+      type: object
+      required:
+      - email
+      - vk_id
+      title: Contacts
+    DecisionIn:
+      properties:
+        decision:
+          type: string
+          enum:
+          - approve
+          - reject
+          title: Decision
+        comment:
+          anyOf:
+          - type: string
+            maxLength: 1000
+          - type: 'null'
+          title: Comment
+          description: Обязателен при отклонении
+      type: object
+      required:
+      - decision
+      title: DecisionIn
+    Error:
+      properties:
+        detail:
+          type: string
+          title: Detail
+          description: Описание ошибки на русском языке
+      type: object
+      required:
+      - detail
+      title: Error
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    HistoryItem:
+      properties:
+        at:
+          type: string
+          format: date-time
+          title: At
+        actor:
+          type: string
+          title: Actor
+        action:
+          type: string
+          title: Action
+        details:
+          type: string
+          title: Details
+      type: object
+      required:
+      - at
+      - actor
+      - action
+      - details
+      title: HistoryItem
+    ManualSwapIn:
+      properties:
+        members:
+          items:
+            $ref: '#/components/schemas/MoveIn'
+          type: array
+          maxItems: 4
+          minItems: 2
+          title: Members
+          description: Кто в какой лагерь переходит; инициатор (X-User-Id) должен быть в списке
+      type: object
+      required:
+      - members
+      title: ManualSwapIn
+    MatchingRun:
+      properties:
+        trigger:
+          type: string
+          title: Trigger
+        started_at:
+          type: string
+          format: date-time
+          title: Started At
+        expired_swap_ids:
+          items:
+            type: integer
+          type: array
+          title: Expired Swap Ids
+          description: Предложения, снятые по истечении срока ответа
+        active_requests:
+          type: integer
+          title: Active Requests
+        graph_edges:
+          type: integer
+          title: Graph Edges
+        cycles_found:
+          type: integer
+          title: Cycles Found
+          description: Найдено допустимых циклов из 2–4 участников
+        proposed_swap_ids:
+          items:
+            type: integer
+          type: array
+          title: Proposed Swap Ids
+          description: Созданные предложения обменов
+        skipped_reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Skipped Reason
+        duration_ms:
+          type: number
+          title: Duration Ms
+      type: object
+      required:
+      - trigger
+      - started_at
+      - expired_swap_ids
+      - active_requests
+      - graph_edges
+      - cycles_found
+      - proposed_swap_ids
+      - skipped_reason
+      - duration_ms
+      title: MatchingRun
+    Me:
+      properties:
+        id:
+          type: string
+          title: Id
+        full_name:
+          type: string
+          title: Full Name
+        role:
+          type: string
+          enum:
+          - participant
+          - camp_leader
+          - coordinator
+          - curator
+          - approver
+          title: Role
+        camp:
+          anyOf:
+          - $ref: '#/components/schemas/Camp'
+          - type: 'null'
+          description: Текущий лагерь (для участника)
+        request:
+          anyOf:
+          - $ref: '#/components/schemas/RequestOut'
+          - type: 'null'
+          description: Заявка на обмен (для участника)
+        active_swap_id:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Active Swap Id
+        camps:
+          items:
+            $ref: '#/components/schemas/Camp'
+          type: array
+          title: Camps
+          description: Закреплённые лагеря (для сотрудников)
+      type: object
+      required:
+      - id
+      - full_name
+      - role
+      title: Me
+    MoveIn:
+      properties:
+        participant_id:
+          type: string
+          title: Participant Id
+        to_camp_id:
+          type: integer
+          title: To Camp Id
+      type: object
+      required:
+      - participant_id
+      - to_camp_id
+      title: MoveIn
+    NotificationOut:
+      properties:
+        id:
+          type: integer
+          title: Id
+        channel:
+          type: string
+          enum:
+          - vk
+          - email
+          title: Channel
+        event:
+          type: string
+          title: Event
+        text:
+          type: string
+          title: Text
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      type: object
+      required:
+      - id
+      - channel
+      - event
+      - text
+      - created_at
+      title: NotificationOut
+    RequestIn:
+      properties:
+        wishes:
+          items:
+            type: integer
+          type: array
+          maxItems: 5
+          minItems: 1
+          title: Wishes
+          description: id желаемых лагерей в порядке приоритета, от 1 до 5, без своего лагеря
+      type: object
+      required:
+      - wishes
+      title: RequestIn
+    RequestOut:
+      properties:
+        participant_id:
+          type: string
+          title: Participant Id
+        status:
+          type: string
+          enum:
+          - active
+          - in_swap
+          - fulfilled
+          - withdrawn
+          title: Status
+        wishes:
+          items:
+            $ref: '#/components/schemas/Wish'
+          type: array
+          title: Wishes
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+        active_swap_id:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Active Swap Id
+          description: Обмен, в который сейчас входит заявка
+      type: object
+      required:
+      - participant_id
+      - status
+      - wishes
+      - created_at
+      - updated_at
+      - active_swap_id
+      title: RequestOut
+    ResponseIn:
+      properties:
+        response:
+          type: string
+          enum:
+          - accepted
+          - declined
+          title: Response
+      type: object
+      required:
+      - response
+      title: ResponseIn
+    Roster:
+      properties:
+        camp:
+          $ref: '#/components/schemas/Camp'
+        participants:
+          items:
+            $ref: '#/components/schemas/RosterItem'
+          type: array
+          title: Participants
+      type: object
+      required:
+      - camp
+      - participants
+      title: Roster
+    RosterItem:
+      properties:
+        participant_id:
+          type: string
+          title: Participant Id
+        full_name:
+          type: string
+          title: Full Name
+        city:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: City
+          description: Кураторам, согласующим и координаторам
+        birth_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Birth Date
+          description: Координатору — для оформления пропусков
+        email:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Email
+          description: Кэмп-лидеру — для связи с группой
+        vk_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Vk Id
+          description: Кэмп-лидеру — для связи с группой
+        arrived_by_swap_id:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Arrived By Swap Id
+          description: Если участник попал в лагерь по обмену — номер обмена
+      type: object
+      required:
+      - participant_id
+      - full_name
+      - arrived_by_swap_id
+      title: RosterItem
+    Swap:
+      properties:
+        id:
+          type: integer
+          title: Id
+        source:
+          type: string
+          enum:
+          - auto
+          - manual
+          title: Source
+          description: auto — найден сервисом подбора, manual — оформлен участниками
+        status:
+          type: string
+          enum:
+          - proposed
+          - confirmed
+          - approved
+          - declined
+          - expired
+          - rejected
+          title: Status
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        expires_at:
+          type: string
+          format: date-time
+          title: Expires At
+          description: Срок ответа участников
+        seconds_left:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Seconds Left
+          description: Сколько секунд осталось на ответ (для статуса proposed)
+        members:
+          items:
+            $ref: '#/components/schemas/SwapMember'
+          type: array
+          title: Members
+        decided_by:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Decided By
+        decided_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Decided At
+        decision_comment:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Decision Comment
+        history:
+          items:
+            $ref: '#/components/schemas/HistoryItem'
+          type: array
+          title: History
+          description: Журнал действий по обмену
+      type: object
+      required:
+      - id
+      - source
+      - status
+      - created_at
+      - expires_at
+      - seconds_left
+      - members
+      - decided_by
+      - decided_at
+      - decision_comment
+      - history
+      title: Swap
+    SwapMember:
+      properties:
+        participant_id:
+          type: string
+          title: Participant Id
+        full_name:
+          type: string
+          title: Full Name
+        city:
+          type: string
+          title: City
+        from_camp:
+          $ref: '#/components/schemas/Camp'
+        to_camp:
+          $ref: '#/components/schemas/Camp'
+        wish_rank:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Wish Rank
+          description: Каким по приоритету желанием участника является новый лагерь
+        response:
+          type: string
+          enum:
+          - pending
+          - accepted
+          - declined
+          title: Response
+        responded_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Responded At
+        contacts:
+          anyOf:
+          - $ref: '#/components/schemas/Contacts'
+          - type: 'null'
+          description: Открываются участникам после подтверждения обмена всеми
+      type: object
+      required:
+      - participant_id
+      - full_name
+      - city
+      - from_camp
+      - to_camp
+      - wish_rank
+      - response
+      - responded_at
+      - contacts
+      title: SwapMember
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+    Wish:
+      properties:
+        rank:
+          type: integer
+          title: Rank
+          description: 'Приоритет: 1 — самый желанный лагерь'
+        camp:
+          $ref: '#/components/schemas/Camp'
+      type: object
+      required:
+      - rank
+      - camp
+      title: Wish
+tags:
+- name: Лагеря
+  description: Каталог лагерей и составы для команд лагерей
+- name: Участник
+  description: Профиль, заявка на обмен, уведомления
+- name: Обмены
+  description: Предложения обменов и ответы участников
+- name: Фонд
+  description: Согласование, выгрузка, ручной запуск подбора
+- name: Демо
+  description: Служебные методы демо-стенда
+servers:
+- url: http://109.123.242.26:8000
+  description: Демо-стенд
+- url: http://127.0.0.1:8000
+  description: Локальный запуск
