@@ -1283,6 +1283,51 @@
           ]
         },
         {
+          "name": "Участник уже в другом активном обмене",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "p003"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/swaps",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "swaps"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"members\": [\n    {\n      \"participant_id\": \"p003\",\n      \"to_camp_id\": 8\n    },\n    {\n      \"participant_id\": \"p001\",\n      \"to_camp_id\": 3\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 409\", () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Сбросить стенд в исходное состояние",
           "request": {
             "method": "POST",

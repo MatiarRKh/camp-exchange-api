@@ -104,6 +104,16 @@ def test_manual_swap_decline_without_request_keeps_camp(client):
     assert note.endswith("Вы остаётесь в своём лагере.")
 
 
+def test_participant_without_request_is_in_one_active_swap_only(client):
+    p009_camp = client.get("/api/v1/me", headers=h("p009")).json()["camp"]["id"]
+    first = {"members": [{"participant_id": "p004", "to_camp_id": p009_camp}, {"participant_id": "p009", "to_camp_id": 13}]}
+    assert client.post("/api/v1/swaps", json=first, headers=h("p004")).status_code == 201
+    # у p009 нет заявки, но он уже в активном обмене: второй обмен и новая заявка — 409
+    second = {"members": [{"participant_id": "p001", "to_camp_id": p009_camp}, {"participant_id": "p009", "to_camp_id": 8}]}
+    assert client.post("/api/v1/swaps", json=second, headers=h("p001")).status_code == 409
+    assert client.put("/api/v1/me/request", json={"wishes": [8]}, headers=h("p009")).status_code == 409
+
+
 def test_season_close_expires_unanswered_offers_but_keeps_fund_queue(client):
     from datetime import date
     from app.store import store
@@ -126,6 +136,8 @@ def test_error_format(client):
     spec = client.get("/openapi.json").json()
     schema = spec["paths"]["/api/v1/me/request"]["put"]["responses"]["422"]["content"]["application/json"]["schema"]
     assert schema == {"$ref": "#/components/schemas/ValidationErrorOut"}
+    header = next(p for p in spec["paths"]["/api/v1/me"]["get"]["parameters"] if p["name"] == "X-User-Id")
+    assert header["required"] is True
 
 
 def test_access_and_validation_errors(client):

@@ -86,12 +86,9 @@ paths:
         description: id лагеря
       - name: X-User-Id
         in: header
-        required: false
+        required: true
         schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          description: Демо-пользователь
+          type: string
           title: X-User-Id
         description: Демо-пользователь
         examples:
@@ -172,12 +169,9 @@ paths:
       parameters:
       - name: X-User-Id
         in: header
-        required: false
+        required: true
         schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          description: Демо-пользователь
+          type: string
           title: X-User-Id
         description: Демо-пользователь
         examples:
@@ -262,12 +256,9 @@ paths:
       parameters:
       - name: X-User-Id
         in: header
-        required: false
+        required: true
         schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          description: Демо-пользователь
+          type: string
           title: X-User-Id
         description: Демо-пользователь
         examples:
@@ -373,12 +364,9 @@ paths:
       parameters:
       - name: X-User-Id
         in: header
-        required: false
+        required: true
         schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          description: Демо-пользователь
+          type: string
           title: X-User-Id
         description: Демо-пользователь
         examples:
@@ -464,12 +452,9 @@ paths:
           title: Limit
       - name: X-User-Id
         in: header
-        required: false
+        required: true
         schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          description: Демо-пользователь
+          type: string
           title: X-User-Id
         description: Демо-пользователь
         examples:
@@ -570,12 +555,9 @@ paths:
         description: Фильтр по статусу; очередь фонда — confirmed
       - name: X-User-Id
         in: header
-        required: false
+        required: true
         schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          description: Демо-пользователь
+          type: string
           title: X-User-Id
         description: Демо-пользователь
         examples:
@@ -662,12 +644,9 @@ paths:
       parameters:
       - name: X-User-Id
         in: header
-        required: false
+        required: true
         schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          description: Демо-пользователь
+          type: string
           title: X-User-Id
         description: Демо-пользователь
         examples:
@@ -771,12 +750,9 @@ paths:
           title: Swap Id
       - name: X-User-Id
         in: header
-        required: false
+        required: true
         schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          description: Демо-пользователь
+          type: string
           title: X-User-Id
         description: Демо-пользователь
         examples:
@@ -869,12 +845,9 @@ paths:
           title: Swap Id
       - name: X-User-Id
         in: header
-        required: false
+        required: true
         schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          description: Демо-пользователь
+          type: string
           title: X-User-Id
         description: Демо-пользователь
         examples:
@@ -982,12 +955,9 @@ paths:
           title: Swap Id
       - name: X-User-Id
         in: header
-        required: false
+        required: true
         schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          description: Демо-пользователь
+          type: string
           title: X-User-Id
         description: Демо-пользователь
         examples:
@@ -1084,12 +1054,9 @@ paths:
       parameters:
       - name: X-User-Id
         in: header
-        required: false
+        required: true
         schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          description: Демо-пользователь
+          type: string
           title: X-User-Id
         description: Демо-пользователь
         examples:
@@ -1170,12 +1137,9 @@ paths:
       parameters:
       - name: X-User-Id
         in: header
-        required: false
+        required: true
         schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          description: Демо-пользователь
+          type: string
           title: X-User-Id
         description: Демо-пользователь
         examples:

@@ -107,13 +107,18 @@ app = FastAPI(
 
 def openapi_in_russian() -> dict:
     """Стандартные подписи FastAPI к ответам — по-русски, а у ответа 422 та же схема, что отдаёт
-    обработчик ошибок валидации (detail — строка, errors — ошибки по полям)."""
+    обработчик ошибок валидации (detail — строка, errors — ошибки по полям). Заголовок X-User-Id
+    в коде необязательный только ради ответа 401 вместо 422; в спецификации он обязательный."""
     if app.openapi_schema is None:
         schema = get_openapi(title=app.title, version=app.version, description=app.description,
                              routes=app.routes, tags=app.openapi_tags)
         labels = {"Successful Response": "Успешный ответ", "Validation Error": "Неверные данные запроса"}
         for operations in schema["paths"].values():
             for operation in operations.values():
+                for param in operation.get("parameters", []):
+                    if param["name"] == "X-User-Id":
+                        param["required"] = True
+                        param["schema"] = {"type": "string", "title": "X-User-Id"}
                 for code, response in operation.get("responses", {}).items():
                     response["description"] = labels.get(response["description"], response["description"])
                     if code == "422":
