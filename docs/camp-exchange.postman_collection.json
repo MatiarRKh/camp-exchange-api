@@ -1,0 +1,1283 @@
+{
+  "info": {
+    "name": "Биржа обмена лагерями — API",
+    "description": "Сквозной сценарий и проверки ошибок для демо-стенда. Запуск: Import → Run collection (папки по порядку) или `npx newman run camp-exchange.postman_collection.json`.\n\nПользователь передаётся заголовком X-User-Id (заглушка входа). Стенд сбрасывается в начале каждой папки и в конце второй.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://109.123.242.26:8000/api/v1"
+    },
+    {
+      "key": "swapId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Обмен по цепочке из четырёх человек",
+      "item": [
+        {
+          "name": "Сбросить стенд",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/demo/reset",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "demo",
+                "reset"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Каталог лагерей",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/camps",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "camps"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 200\", () => pm.response.to.have.status(200));",
+                  "const camps = pm.response.json();",
+                  "pm.test(\"63 лагеря сезона\", () => pm.expect(camps.length).to.eql(63));",
+                  "pm.test(\"Из Кижей (id 8) хочет уйти Анна, попасть туда пока не хочет никто\", () => {",
+                  "  const kizhi = camps.find(c => c.id === 8);",
+                  "  pm.expect(kizhi.want_to_leave).to.eql(1);",
+                  "  pm.expect(kizhi.want_to_join).to.eql(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Григорий (p004) подаёт заявку в Кижи",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "p004"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me/request",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "request"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"wishes\": [\n    8,\n    17\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Заявка замыкает цепочку Кижи → Валдайский → Забайкальский → Пасвик: подбор запускается сразу."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 201\", () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Заявка сразу попала в обмен\", () => pm.expect(body.status).to.eql(\"in_swap\"));",
+                  "pm.test(\"Желание №1 — Кижи\", () => pm.expect(body.wishes[0].camp.id).to.eql(8));",
+                  "pm.collectionVariables.set(\"swapId\", body.active_swap_id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Карточка обмена глазами Григория",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "p004"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/swaps/{{swapId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "swaps",
+                "{{swapId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 200\", () => pm.response.to.have.status(200));",
+                  "const swap = pm.response.json();",
+                  "pm.test(\"Цепочка из четырёх, статус proposed\", () => {",
+                  "  pm.expect(swap.members.length).to.eql(4);",
+                  "  pm.expect(swap.status).to.eql(\"proposed\");",
+                  "});",
+                  "pm.test(\"Кто куда: каждый получает лагерь следующего\", () => {",
+                  "  const moves = Object.fromEntries(swap.members.map(m => [m.participant_id, [m.from_camp.id, m.to_camp.id]]));",
+                  "  pm.expect(moves).to.eql({p001: [8, 7], p002: [7, 3], p003: [3, 13], p004: [13, 8]});",
+                  "});",
+                  "pm.test(\"Контакты до подтверждения скрыты\", () => swap.members.forEach(m => pm.expect(m.contacts).to.be.null));",
+                  "pm.test(\"Срок ответа — около 48 часов\", () => pm.expect(swap.seconds_left).to.be.within(47 * 3600, 48 * 3600));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Фонд не может согласовать, пока не согласны все",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "approver1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/swaps/{{swapId}}/decision",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "swaps",
+                "{{swapId}}",
+                "decision"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"approve\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"Понятное сообщение об ошибке\", () => pm.expect(pm.response.json().detail).to.include(\"подтверждённым\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Анна (p001) соглашается",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "p001"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/swaps/{{swapId}}/members/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "swaps",
+                "{{swapId}}",
+                "members",
+                "me"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"response\": \"accepted\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Обмен ещё ждёт остальных\", () => pm.expect(pm.response.json().status).to.eql(\"proposed\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Борис (p002) соглашается",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "p002"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/swaps/{{swapId}}/members/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "swaps",
+                "{{swapId}}",
+                "members",
+                "me"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"response\": \"accepted\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Обмен ещё ждёт остальных\", () => pm.expect(pm.response.json().status).to.eql(\"proposed\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Виктория (p003) соглашается",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "p003"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/swaps/{{swapId}}/members/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "swaps",
+                "{{swapId}}",
+                "members",
+                "me"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"response\": \"accepted\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Обмен ещё ждёт остальных\", () => pm.expect(pm.response.json().status).to.eql(\"proposed\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Григорий (p004) соглашается последним",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "p004"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/swaps/{{swapId}}/members/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "swaps",
+                "{{swapId}}",
+                "members",
+                "me"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"response\": \"accepted\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 200\", () => pm.response.to.have.status(200));",
+                  "const swap = pm.response.json();",
+                  "pm.test(\"Все согласны — статус confirmed\", () => pm.expect(swap.status).to.eql(\"confirmed\"));",
+                  "pm.test(\"Контакты открыты\", () => swap.members.forEach(m => pm.expect(m.contacts.email).to.be.a(\"string\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Повторный ответ невозможен",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "p001"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/swaps/{{swapId}}/members/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "swaps",
+                "{{swapId}}",
+                "members",
+                "me"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"response\": \"declined\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 409\", () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Очередь согласующего",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "approver1"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/swaps?status=confirmed",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "swaps"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "confirmed"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Обмен в очереди\", () => pm.expect(pm.response.json().map(s => s.id)).to.include(Number(pm.collectionVariables.get(\"swapId\"))));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Согласующий одобряет обмен",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "approver1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/swaps/{{swapId}}/decision",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "swaps",
+                "{{swapId}}",
+                "decision"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"approve\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Статус approved\", () => pm.expect(pm.response.json().status).to.eql(\"approved\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Григорий теперь в Кижах",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "p004"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 200\", () => pm.response.to.have.status(200));",
+                  "const me = pm.response.json();",
+                  "pm.test(\"Текущий лагерь — Кижи\", () => pm.expect(me.camp.id).to.eql(8));",
+                  "pm.test(\"Заявка закрыта\", () => pm.expect(me.request.status).to.eql(\"fulfilled\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Состав Кижей для кэмп-лидера",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "leader1"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/camps/8/roster",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "camps",
+                "8",
+                "roster"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 200\", () => pm.response.to.have.status(200));",
+                  "const g = pm.response.json().participants.find(p => p.participant_id === \"p004\");",
+                  "pm.test(\"Григорий в составе, пришёл по обмену\", () => pm.expect(g.arrived_by_swap_id).to.eql(Number(pm.collectionVariables.get(\"swapId\"))));",
+                  "pm.test(\"Кэмп-лидеру — контакты, без даты рождения\", () => { pm.expect(g.email).to.be.a(\"string\"); pm.expect(g.birth_date).to.be.null; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Состав Кижей для координатора",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "coord1"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/camps/8/roster",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "camps",
+                "8",
+                "roster"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Координатору — данные для пропусков, без контактов\", () => pm.response.json().participants.forEach(p => {",
+                  "  pm.expect(p.birth_date).to.be.a('string');",
+                  "  pm.expect(p.email).to.be.null;",
+                  "}));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Уведомления кэмп-лидера",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "leader1"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me/notifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "notifications"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Пришло уведомление о смене состава\", () => pm.expect(pm.response.json().map(n => n.event)).to.include(\"swap.approved\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Выгрузка согласованных обменов",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "approver1"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/exports/approved-swaps.csv",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "exports",
+                "approved-swaps.csv"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"CSV с Григорием\", () => pm.expect(pm.response.text()).to.include(\"Григорий Павлов\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Отказы и ошибки",
+      "item": [
+        {
+          "name": "Сбросить стенд",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/demo/reset",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "demo",
+                "reset"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Неизвестный пользователь",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "nobody"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Участник не может принимать решения фонда",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "p007"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/swaps/2/decision",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "swaps",
+                "2",
+                "decision"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"approve\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Кэмп-лидер не видит чужой лагерь",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "leader1"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/camps/3/roster",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "camps",
+                "3",
+                "roster"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Нельзя указать свой лагерь в желаниях",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "p004"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me/request",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "request"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"wishes\": [\n    13\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 422\", () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Больше пяти желаний нельзя",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "p004"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me/request",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "request"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"wishes\": [\n    1,\n    2,\n    4,\n    5,\n    6,\n    9\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 422\", () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Отклонить без комментария нельзя",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "approver1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/swaps/2/decision",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "swaps",
+                "2",
+                "decision"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"reject\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 422\", () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Отклонение с комментарием",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "approver1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/swaps/2/decision",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "swaps",
+                "2",
+                "decision"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"reject\",\n  \"comment\": \"Билеты уже выкуплены фондом\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Статус rejected, комментарий сохранён\", () => {",
+                  "  const s = pm.response.json();",
+                  "  pm.expect(s.status).to.eql(\"rejected\");",
+                  "  pm.expect(s.decision_comment).to.eql(\"Билеты уже выкуплены фондом\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Отказ участника отменяет обмен для всех",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "p005"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/swaps/1/members/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "swaps",
+                "1",
+                "members",
+                "me"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"response\": \"declined\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Статус declined\", () => pm.expect(pm.response.json().status).to.eql(\"declined\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Второй участник вернулся в подбор",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "p006"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 200\", () => pm.response.to.have.status(200));",
+                  "const me = pm.response.json();",
+                  "pm.test(\"Заявка снова активна, обмена нет\", () => { pm.expect(me.request.status).to.eql(\"active\"); pm.expect(me.active_swap_id).to.be.null; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Оформление незамкнутого обмена",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "p001"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/swaps",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "swaps"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"members\": [\n    {\n      \"participant_id\": \"p001\",\n      \"to_camp_id\": 7\n    },\n    {\n      \"participant_id\": \"p002\",\n      \"to_camp_id\": 3\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 422\", () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Оформление договорённого обмена",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "p001"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/swaps",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "swaps"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"members\": [\n    {\n      \"participant_id\": \"p001\",\n      \"to_camp_id\": 7\n    },\n    {\n      \"participant_id\": \"p002\",\n      \"to_camp_id\": 8\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 201\", () => pm.response.to.have.status(201));",
+                  "const s = pm.response.json();",
+                  "pm.test(\"Источник manual, согласие инициатора учтено\", () => {",
+                  "  pm.expect(s.source).to.eql(\"manual\");",
+                  "  pm.expect(s.members.find(m => m.participant_id === \"p001\").response).to.eql(\"accepted\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Сбросить стенд в исходное состояние",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/demo/reset",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "demo",
+                "reset"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
