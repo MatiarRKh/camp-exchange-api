@@ -19,33 +19,32 @@ else (да)
 endif
 :Записать matching_run (started_at, trigger);
 |API-сервис|
-:POST /internal/v1/swaps/expire\nснять предложения status = proposed\nи expires_at < now() → expired;
-:Опубликовать swap.expired\nпо каждому снятому обмену;
+:POST /internal/v1/swaps/expire\nproposed → expired, если истекли 48 ч\nили закончился период обменов;
+:Опубликовать swap.closed (status = expired)\nпо каждому снятому обмену;
 |Сервис подбора|
-if (Период обменов открыт?) then (нет)
+if (Период обменов открыт?) then (да)
+  |API-сервис|
+  :GET /internal/v1/matching/snapshot\nактивные заявки, текущие лагеря,\nстоп-лист комбинаций, snapshot_version;
+  |Сервис подбора|
+  :Построить граф желаний:\nребро A → B, если лагерь B есть в желаниях A;
+  :Найти все простые циклы длиной 2–4\n(обход в глубину от участника\nс наименьшим id);
+  :Отбросить циклы из стоп-листа;
+  if (Циклы есть?) then (да)
+    fork
+      :Точный выбор: ЦЛП\nmax Σ w·x, Σ x ≤ 1 на участника\n(лимит 10 с);
+    fork again
+      :Жадный выбор\nпо убыванию веса;
+    end fork
+    :Взять набор с большим весом,\nзаписать selection: optimal / best_found;
+    :Опубликовать swap.candidates_found\n{run_id, snapshot_version, cycles};
+  else (нет)
+    :selection = none;
+  endif
+else (нет)
   :matching_run: skipped;
-  stop
-else (да)
 endif
-|API-сервис|
-:GET /internal/v1/matching/snapshot\nактивные заявки, текущие лагеря,\nстоп-лист комбинаций, snapshot_version;
-|Сервис подбора|
-:Построить граф желаний:\nребро A → B, если лагерь B есть в желаниях A;
-:Найти все простые циклы длиной 2–4\n(обход в глубину от участника\nс наименьшим id);
-:Отбросить циклы из стоп-листа;
-if (Циклы есть?) then (нет)
-  :matching_run: 0 кандидатов;
-  stop
-else (да)
-endif
-fork
-  :Точный выбор: ЦЛП\nmax Σ w·x, Σ x ≤ 1 на участника\n(лимит 10 с);
-fork again
-  :Жадный выбор\nпо убыванию веса;
-end fork
-:Взять набор с большим\nсуммарным весом;
-:Опубликовать swap.candidates_found\n{run_id, snapshot_version, cycles};
-:Записать итоги matching_run,\nснять блокировку;
+:Записать итоги matching_run;
+:Снять блокировку\n(на любом выходе, в том числе при ошибке:\ntry / finally);
 if (Флаг «повторить» выставлен?) then (да)
   :Запустить ещё раз;
 else (нет)

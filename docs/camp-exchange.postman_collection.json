@@ -768,6 +768,34 @@
           ]
         },
         {
+          "name": "Без заголовка X-User-Id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Ошибка в едином формате: detail — строка\", () => pm.expect(pm.response.json().detail).to.be.a(\"string\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Неизвестный пользователь",
           "request": {
             "method": "GET",
@@ -966,7 +994,12 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Статус 422\", () => pm.response.to.have.status(422));"
+                  "pm.test(\"Статус 422\", () => pm.response.to.have.status(422));",
+                  "const err = pm.response.json();",
+                  "pm.test(\"detail — строка, ошибки по полям — в errors\", () => {",
+                  "  pm.expect(err.detail).to.be.a(\"string\");",
+                  "  pm.expect(err.errors[0].field).to.eql(\"body.wishes\");",
+                  "});"
                 ]
               }
             }

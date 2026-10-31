@@ -15,6 +15,16 @@ class Error(BaseModel):
     detail: str = Field(description="Описание ошибки на русском языке")
 
 
+class FieldError(BaseModel):
+    field: str = Field(description="Поле запроса, например body.wishes")
+    message: str
+
+
+class ValidationErrorOut(BaseModel):
+    detail: str = Field(description="Описание ошибки на русском языке")
+    errors: list[FieldError] | None = Field(None, description="Ошибки по полям — только при ошибках формата запроса")
+
+
 class Camp(BaseModel):
     id: int
     name: str
@@ -142,6 +152,9 @@ class MatchingRun(BaseModel):
     graph_edges: int
     cycles_found: int = Field(description="Найдено допустимых циклов из 2–4 участников")
     proposed_swap_ids: list[int] = Field(description="Созданные предложения обменов")
+    selection: Literal["optimal", "best_found", "greedy", "none"] | None = Field(
+        description="Как выбран набор циклов: optimal — решатель доказал оптимум; best_found — лимит времени, "
+                    "взят лучший из найденного решателем и жадного выбора; greedy — только жадный выбор; none — циклов нет")
     skipped_reason: str | None
     duration_ms: float
 

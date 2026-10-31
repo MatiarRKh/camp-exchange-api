@@ -94,8 +94,41 @@ def test_manual_swap_validation(client):
     assert {m["participant_id"]: m["response"] for m in swap["members"]} == {"p001": "accepted", "p002": "pending"}
 
 
+def test_manual_swap_decline_without_request_keeps_camp(client):
+    ok = {"members": [{"participant_id": "p004", "to_camp_id": 32}, {"participant_id": "p009", "to_camp_id": 13}]}
+    p009_camp = client.get("/api/v1/me", headers=h("p009")).json()["camp"]["id"]
+    ok["members"][0]["to_camp_id"] = p009_camp
+    swap = client.post("/api/v1/swaps", json=ok, headers=h("p004")).json()
+    client.patch(f"/api/v1/swaps/{swap['id']}/members/me", json={"response": "declined"}, headers=h("p009"))
+    note = client.get("/api/v1/me/notifications", headers=h("p004")).json()[0]["text"]
+    assert note.endswith("Вы остаётесь в своём лагере.")
+
+
+def test_season_close_expires_unanswered_offers_but_keeps_fund_queue(client):
+    from datetime import date
+    from app.store import store
+    store.season.exchange_closes = date(2026, 1, 1)
+    run = client.post("/api/v1/matching/runs", headers=h("curator1")).json()
+    assert 1 in run["expired_swap_ids"] and run["skipped_reason"]
+    assert client.get("/api/v1/swaps/1", headers=h("p005")).json()["status"] == "expired"
+    # подтверждённый участниками обмен остаётся в очереди фонда и согласуется
+    r = client.post("/api/v1/swaps/2/decision", json={"decision": "approve"}, headers=h("approver1"))
+    assert r.json()["status"] == "approved"
+    assert client.put("/api/v1/me/request", json={"wishes": [8]}, headers=h("p004")).status_code == 403
+
+
+def test_error_format(client):
+    r = client.get("/api/v1/me")  # нет заголовка
+    assert r.status_code == 401 and isinstance(r.json()["detail"], str)
+    r = client.put("/api/v1/me/request", json={"wishes": [1, 2, 3, 4, 5, 6]}, headers=h("p004"))
+    assert r.status_code == 422 and isinstance(r.json()["detail"], str)
+    assert r.json()["errors"][0]["field"] == "body.wishes"
+    spec = client.get("/openapi.json").json()
+    schema = spec["paths"]["/api/v1/me/request"]["put"]["responses"]["422"]["content"]["application/json"]["schema"]
+    assert schema == {"$ref": "#/components/schemas/ValidationErrorOut"}
+
+
 def test_access_and_validation_errors(client):
-    assert client.get("/api/v1/me").status_code == 422  # нет заголовка
     assert client.get("/api/v1/me", headers=h("nobody")).status_code == 401
     assert client.post("/api/v1/swaps/2/decision", json={"decision": "approve"}, headers=h("p001")).status_code == 403
     assert client.get("/api/v1/camps/8/roster", headers=h("p001")).status_code == 403
@@ -118,5 +151,6 @@ def test_selection_prefers_more_participants():
     wishes = {"A": ["b", "c"], "B": ["a", "c"], "C": ["a"]}
     camps = {"A": "a", "B": "b", "C": "c"}
     cycles = find_cycles(build_graph(wishes, camps))
-    chosen = select_cycles(cycles)
+    chosen, selection = select_cycles(cycles)
     assert len(chosen) == 1 and {pid for pid, _ in chosen[0]} == {"A", "B", "C"}
+    assert selection == "optimal"

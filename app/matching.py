@@ -78,29 +78,36 @@ def cycle_weight(cycle: Cycle, big: int) -> int:
     return len(cycle) * big + sum(MAX_WISHES + 1 - rank for _, rank in cycle)
 
 
-def select_cycles(cycles: list[Cycle]) -> list[Cycle]:
+def select_cycles(cycles: list[Cycle]) -> tuple[list[Cycle], str]:
     """Набор циклов без общих участников с максимальным суммарным весом.
 
     Задача целочисленного линейного программирования:
     max Σ w_j·x_j при Σ x_j ≤ 1 по циклам j, содержащим участника i, x_j ∈ {0, 1}.
     На больших пулах заявок решатель может не доказать оптимум за отведённое
     время, поэтому результат сравнивается с жадным выбором и берётся лучший.
+
+    Второй элемент ответа говорит, насколько результат надёжен:
+    optimal — решатель доказал оптимум по числу участников (приоритеты — с малым допуском);
+    best_found — лимит времени истёк, взят лучший из найденного решателем и жадного выбора;
+    greedy — решатель ничего не нашёл, взят жадный выбор; none — циклов нет.
     """
     if not cycles:
-        return []
+        return [], "none"
     nodes = sorted({pid for cycle in cycles for pid, _ in cycle})
     big = MAX_WISHES * len(nodes) + 1
     greedy = _select_greedy(cycles, big)
-    exact = _select_exact(cycles, nodes, big)
+    exact, proven = _select_exact(cycles, nodes, big)
     if exact is None:
-        return greedy
+        return greedy, "greedy"
+    if proven:
+        return exact, "optimal"
     total = lambda chosen: sum(cycle_weight(c, big) for c in chosen)  # noqa: E731
-    return exact if total(exact) >= total(greedy) else greedy
+    return (exact if total(exact) >= total(greedy) else greedy), "best_found"
 
 
-def _select_exact(cycles: list[Cycle], nodes: list[str], big: int) -> list[Cycle] | None:
-    """Решение ЦЛП через HiGHS (scipy.optimize.milp); None, если решатель ничего не нашёл."""
-    index ={pid: i for i, pid in enumerate(nodes)}
+def _select_exact(cycles: list[Cycle], nodes: list[str], big: int) -> tuple[list[Cycle] | None, bool]:
+    """Решение ЦЛП через HiGHS (scipy.optimize.milp) и признак, доказан ли оптимум."""
+    index = {pid: i for i, pid in enumerate(nodes)}
     weights = np.array([cycle_weight(c, big) for c in cycles], dtype=float)
 
     rows, cols = [], []
@@ -120,8 +127,8 @@ def _select_exact(cycles: list[Cycle], nodes: list[str], big: int) -> list[Cycle
         options={"mip_rel_gap": 0.5 / len(nodes), "time_limit": SOLVER_TIME_LIMIT_SEC},
     )
     if result.x is None:
-        return None
-    return [cycles[j] for j in range(len(cycles)) if result.x[j] > 0.5]
+        return None, False
+    return [cycles[j] for j in range(len(cycles)) if result.x[j] > 0.5], result.status == 0
 
 
 def _select_greedy(cycles: list[Cycle], big: int) -> list[Cycle]:

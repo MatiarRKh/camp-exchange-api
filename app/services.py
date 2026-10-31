@@ -167,14 +167,30 @@ def close_swap(swap: Swap, status: str, actor: str, reason: str) -> None:
     """Неудачный исход: участники возвращаются в подбор, комбинация больше не предлагается."""
     swap.status = status
     store.banned.add(swap.combination())
+    back_to_matching = set()
     for m in swap.members:
         request = store.requests.get(m.participant_id)
         if request and request.status == REQUEST_IN_SWAP:
             request.status = REQUEST_ACTIVE
             request.updated_at = now()
+            back_to_matching.add(m.participant_id)
     log(actor, f"swap.{status}", swap.id, reason)
+    # Участник договорённого обмена мог не подавать заявку: ему нечего возвращать в подбор.
     for m in swap.members:
-        notify(m.participant_id, f"swap.{status}", f"Обмен №{swap.id} не состоится: {reason}. Ваша заявка снова участвует в подборе.")
+        tail = ("Ваша заявка снова участвует в подборе." if m.participant_id in back_to_matching and exchange_open()
+                else "Вы остаётесь в своём лагере.")
+        notify(m.participant_id, f"swap.{status}", f"Обмен №{swap.id} не состоится: {reason}. {tail}")
+
+
+def expire_reason(swap: Swap) -> str | None:
+    """Почему предложение пора снять: истёк срок ответа или закончился период обменов."""
+    if swap.status != PROPOSED:
+        return None
+    if swap.expires_at < now():
+        return "не все участники ответили вовремя"
+    if not exchange_open():
+        return "период обменов закончился"
+    return None
 
 
 def respond(swap_id: int, participant: Participant, response: str) -> Swap:
@@ -182,8 +198,9 @@ def respond(swap_id: int, participant: Participant, response: str) -> Swap:
     member = swap.member(participant.id)
     if member is None:
         raise DomainError(403, "Вы не участник этого обмена")
-    if swap.status == PROPOSED and swap.expires_at < now():
-        close_swap(swap, EXPIRED, MATCHING_SERVICE, "не все участники ответили вовремя")
+    reason = expire_reason(swap)
+    if reason:
+        close_swap(swap, EXPIRED, MATCHING_SERVICE, reason)
     if swap.status != PROPOSED:
         raise DomainError(409, f"Обмен в статусе «{swap.status}», ответить на него уже нельзя")
     if member.response != "pending":
@@ -242,10 +259,15 @@ def decide(swap_id: int, approver: Staff, decision: str, comment: str | None) ->
 # ---------- Обработчик по расписанию ----------
 
 def expire_offers() -> list[int]:
-    expired = [s for s in store.swaps.values() if s.status == PROPOSED and s.expires_at < now()]
-    for swap in expired:
-        close_swap(swap, EXPIRED, MATCHING_SERVICE, "не все участники ответили вовремя")
-    return [s.id for s in expired]
+    """Снимает предложения с истёкшим сроком ответа, а после окончания периода обменов — все
+    неотвеченные. Подтверждённые участниками обмены остаются в очереди фонда."""
+    expired = []
+    for swap in list(store.swaps.values()):
+        reason = expire_reason(swap)
+        if reason:
+            close_swap(swap, EXPIRED, MATCHING_SERVICE, reason)
+            expired.append(swap.id)
+    return expired
 
 
 def run_matching(trigger: str) -> dict:
@@ -254,7 +276,7 @@ def run_matching(trigger: str) -> dict:
     t0 = time.perf_counter()
     report = {"trigger": trigger, "started_at": started, "expired_swap_ids": expire_offers(),
               "active_requests": 0, "graph_edges": 0, "cycles_found": 0, "proposed_swap_ids": [],
-              "skipped_reason": None}
+              "selection": None, "skipped_reason": None}
 
     if not exchange_open():
         report["skipped_reason"] = "период обменов закрыт"
@@ -270,9 +292,11 @@ def run_matching(trigger: str) -> dict:
             ]
             if frozenset((m.participant_id, m.to_camp_id) for m in members) not in store.banned:
                 cycles.append((cycle, members))
-        chosen = set(matching.select_cycles([c for c, _ in cycles]))
+        chosen, selection = matching.select_cycles([c for c, _ in cycles])
+        chosen = set(chosen)
         report["proposed_swap_ids"] = [create_swap(members, "auto", None).id for cycle, members in cycles if cycle in chosen]
-        report.update(active_requests=len(wishes), graph_edges=sum(len(e) for e in graph.values()), cycles_found=len(cycles))
+        report.update(active_requests=len(wishes), graph_edges=sum(len(e) for e in graph.values()),
+                      cycles_found=len(cycles), selection=selection)
 
     report["duration_ms"] = round((time.perf_counter() - t0) * 1000, 1)
     return report

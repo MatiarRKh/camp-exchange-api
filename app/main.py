@@ -8,6 +8,7 @@ from typing import Annotated
 
 from fastapi import Body, Depends, FastAPI, Header, HTTPException, Path, Query, Request, Response
 from fastapi.concurrency import run_in_threadpool
+from fastapi.exceptions import RequestValidationError
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse, RedirectResponse
 
@@ -105,15 +106,25 @@ app = FastAPI(
 
 
 def openapi_in_russian() -> dict:
-    """Стандартные подписи FastAPI к ответам — по-русски, как и остальная спецификация."""
+    """Стандартные подписи FastAPI к ответам — по-русски, а у ответа 422 та же схема, что отдаёт
+    обработчик ошибок валидации (detail — строка, errors — ошибки по полям)."""
     if app.openapi_schema is None:
         schema = get_openapi(title=app.title, version=app.version, description=app.description,
                              routes=app.routes, tags=app.openapi_tags)
-        labels = {"Successful Response": "Успешный ответ", "Validation Error": "Ошибка валидации запроса"}
+        labels = {"Successful Response": "Успешный ответ", "Validation Error": "Неверные данные запроса"}
         for operations in schema["paths"].values():
             for operation in operations.values():
-                for response in operation.get("responses", {}).values():
+                for code, response in operation.get("responses", {}).items():
                     response["description"] = labels.get(response["description"], response["description"])
+                    if code == "422":
+                        ref = {"$ref": "#/components/schemas/ValidationErrorOut"}
+                        response["content"] = {"application/json": {"schema": ref}}
+        components = schema["components"]["schemas"]
+        for name in ("HTTPValidationError", "ValidationError"):
+            components.pop(name, None)
+        out = schemas.ValidationErrorOut.model_json_schema(ref_template="#/components/schemas/{model}")
+        components.update(out.pop("$defs", {}))
+        components["ValidationErrorOut"] = out
         app.openapi_schema = schema
     return app.openapi_schema
 
@@ -126,6 +137,14 @@ async def domain_error_handler(_: Request, exc: services.DomainError) -> JSONRes
     return JSONResponse(status_code=exc.status, content={"detail": exc.detail})
 
 
+@app.exception_handler(RequestValidationError)
+async def validation_error_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
+    """Ошибки формата запроса в том же виде, что и остальные: detail — строка, плюс ошибки по полям."""
+    errors = [{"field": ".".join(str(p) for p in e["loc"]), "message": e["msg"]} for e in exc.errors()]
+    text = "; ".join(f"{e['field']}: {e['message']}" for e in errors)
+    return JSONResponse(status_code=422, content={"detail": f"Неверные данные запроса — {text}", "errors": errors})
+
+
 # ---------- Авторизация (заглушка) ----------
 
 def auth(*preferred: str, roles: set[str] | None = None):
@@ -134,8 +153,10 @@ def auth(*preferred: str, roles: set[str] | None = None):
     examples = {uid: {"summary": f"{uid} — {DEMO_USERS[uid]}", "value": uid} for uid in order}
 
     def dependency(
-        x_user_id: Annotated[str, Header(alias="X-User-Id", description="Демо-пользователь", openapi_examples=examples)],
+        x_user_id: Annotated[str | None, Header(alias="X-User-Id", description="Демо-пользователь", openapi_examples=examples)] = None,
     ) -> Participant | Staff:
+        if not x_user_id:
+            raise HTTPException(401, "Не передан заголовок X-User-Id: список демо-пользователей — в описании API")
         user = store.user(x_user_id)
         if user is None:
             raise HTTPException(401, "Неизвестный пользователь: список демо-пользователей — в описании API")
@@ -389,7 +410,7 @@ def respond_to_swap(
 # ---------- Фонд ----------
 
 @app.post("/api/v1/swaps/{swap_id}/decision", tags=["Фонд"], summary="Согласовать или отклонить обмен",
-          response_model=schemas.Swap, responses={**ERRORS, 422: {"model": schemas.Error, "description": "Отклонение без комментария"}})
+          response_model=schemas.Swap, responses={**ERRORS, 422: {"model": schemas.ValidationErrorOut, "description": "Неверные данные запроса или отклонение без комментария"}})
 def decide_swap(
     swap_id: Annotated[int, Path(examples=[2])],
     user: Annotated[Staff, Depends(auth("approver1", roles={APPROVER}))],

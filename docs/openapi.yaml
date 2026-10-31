@@ -59,11 +59,11 @@ paths:
                   $ref: '#/components/schemas/CampCatalogItem'
                 title: Response List Camps
         '422':
-          description: Ошибка валидации запроса
+          description: Неверные данные запроса
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: '#/components/schemas/ValidationErrorOut'
   /api/v1/camps/{camp_id}/roster:
     get:
       tags:
@@ -86,9 +86,11 @@ paths:
         description: id лагеря
       - name: X-User-Id
         in: header
-        required: true
+        required: false
         schema:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
           description: Демо-пользователь
           title: X-User-Id
         description: Демо-пользователь
@@ -155,11 +157,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '422':
-          description: Ошибка валидации запроса
+          description: Неверные данные запроса
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: '#/components/schemas/ValidationErrorOut'
   /api/v1/me:
     get:
       tags:
@@ -170,9 +172,11 @@ paths:
       parameters:
       - name: X-User-Id
         in: header
-        required: true
+        required: false
         schema:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
           description: Демо-пользователь
           title: X-User-Id
         description: Демо-пользователь
@@ -239,11 +243,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '422':
-          description: Ошибка валидации запроса
+          description: Неверные данные запроса
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: '#/components/schemas/ValidationErrorOut'
   /api/v1/me/request:
     put:
       tags:
@@ -258,9 +262,11 @@ paths:
       parameters:
       - name: X-User-Id
         in: header
-        required: true
+        required: false
         schema:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
           description: Демо-пользователь
           title: X-User-Id
         description: Демо-пользователь
@@ -353,11 +359,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/RequestOut'
         '422':
-          description: Ошибка валидации запроса
+          description: Неверные данные запроса
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: '#/components/schemas/ValidationErrorOut'
     delete:
       tags:
       - Участник
@@ -367,9 +373,11 @@ paths:
       parameters:
       - name: X-User-Id
         in: header
-        required: true
+        required: false
         schema:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
           description: Демо-пользователь
           title: X-User-Id
         description: Демо-пользователь
@@ -432,11 +440,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '422':
-          description: Ошибка валидации запроса
+          description: Неверные данные запроса
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: '#/components/schemas/ValidationErrorOut'
   /api/v1/me/notifications:
     get:
       tags:
@@ -456,9 +464,11 @@ paths:
           title: Limit
       - name: X-User-Id
         in: header
-        required: true
+        required: false
         schema:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
           description: Демо-пользователь
           title: X-User-Id
         description: Демо-пользователь
@@ -528,11 +538,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '422':
-          description: Ошибка валидации запроса
+          description: Неверные данные запроса
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: '#/components/schemas/ValidationErrorOut'
   /api/v1/swaps:
     get:
       tags:
@@ -560,9 +570,11 @@ paths:
         description: Фильтр по статусу; очередь фонда — confirmed
       - name: X-User-Id
         in: header
-        required: true
+        required: false
         schema:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
           description: Демо-пользователь
           title: X-User-Id
         description: Демо-пользователь
@@ -632,11 +644,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '422':
-          description: Ошибка валидации запроса
+          description: Неверные данные запроса
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: '#/components/schemas/ValidationErrorOut'
     post:
       tags:
       - Обмены
@@ -650,9 +662,11 @@ paths:
       parameters:
       - name: X-User-Id
         in: header
-        required: true
+        required: false
         schema:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
           description: Демо-пользователь
           title: X-User-Id
         description: Демо-пользователь
@@ -734,11 +748,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '422':
-          description: Ошибка валидации запроса
+          description: Неверные данные запроса
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: '#/components/schemas/ValidationErrorOut'
   /api/v1/swaps/{swap_id}:
     get:
       tags:
@@ -757,9 +771,11 @@ paths:
           title: Swap Id
       - name: X-User-Id
         in: header
-        required: true
+        required: false
         schema:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
           description: Демо-пользователь
           title: X-User-Id
         description: Демо-пользователь
@@ -826,11 +842,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '422':
-          description: Ошибка валидации запроса
+          description: Неверные данные запроса
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: '#/components/schemas/ValidationErrorOut'
   /api/v1/swaps/{swap_id}/members/me:
     patch:
       tags:
@@ -853,9 +869,11 @@ paths:
           title: Swap Id
       - name: X-User-Id
         in: header
-        required: true
+        required: false
         schema:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
           description: Демо-пользователь
           title: X-User-Id
         description: Демо-пользователь
@@ -937,11 +955,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '422':
-          description: Ошибка валидации запроса
+          description: Неверные данные запроса
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: '#/components/schemas/ValidationErrorOut'
   /api/v1/swaps/{swap_id}/decision:
     post:
       tags:
@@ -964,9 +982,11 @@ paths:
           title: Swap Id
       - name: X-User-Id
         in: header
-        required: true
+        required: false
         schema:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
           description: Демо-пользователь
           title: X-User-Id
         description: Демо-пользователь
@@ -1049,11 +1069,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '422':
-          description: Отклонение без комментария
+          description: Неверные данные запроса или отклонение без комментария
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/ValidationErrorOut'
   /api/v1/exports/approved-swaps.csv:
     get:
       tags:
@@ -1064,9 +1084,11 @@ paths:
       parameters:
       - name: X-User-Id
         in: header
-        required: true
+        required: false
         schema:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
           description: Демо-пользователь
           title: X-User-Id
         description: Демо-пользователь
@@ -1131,11 +1153,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '422':
-          description: Ошибка валидации запроса
+          description: Неверные данные запроса
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: '#/components/schemas/ValidationErrorOut'
   /api/v1/matching/runs:
     post:
       tags:
@@ -1148,9 +1170,11 @@ paths:
       parameters:
       - name: X-User-Id
         in: header
-        required: true
+        required: false
         schema:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
           description: Демо-пользователь
           title: X-User-Id
         description: Демо-пользователь
@@ -1217,11 +1241,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '422':
-          description: Ошибка валидации запроса
+          description: Неверные данные запроса
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: '#/components/schemas/ValidationErrorOut'
   /api/v1/demo/reset:
     post:
       tags:
@@ -1347,15 +1371,20 @@ components:
       required:
       - detail
       title: Error
-    HTTPValidationError:
+    FieldError:
       properties:
-        detail:
-          items:
-            $ref: '#/components/schemas/ValidationError'
-          type: array
-          title: Detail
+        field:
+          description: Поле запроса, например body.wishes
+          title: Field
+          type: string
+        message:
+          title: Message
+          type: string
+      required:
+      - field
+      - message
+      title: FieldError
       type: object
-      title: HTTPValidationError
     HistoryItem:
       properties:
         at:
@@ -1423,6 +1452,18 @@ components:
           type: array
           title: Proposed Swap Ids
           description: Созданные предложения обменов
+        selection:
+          anyOf:
+          - type: string
+            enum:
+            - optimal
+            - best_found
+            - greedy
+            - none
+          - type: 'null'
+          title: Selection
+          description: 'Как выбран набор циклов: optimal — решатель доказал оптимум; best_found — лимит времени, взят лучший
+            из найденного решателем и жадного выбора; greedy — только жадный выбор; none — циклов нет'
         skipped_reason:
           anyOf:
           - type: string
@@ -1440,6 +1481,7 @@ components:
       - graph_edges
       - cycles_found
       - proposed_swap_ids
+      - selection
       - skipped_reason
       - duration_ms
       title: MatchingRun
@@ -1784,32 +1826,25 @@ components:
       - responded_at
       - contacts
       title: SwapMember
-    ValidationError:
+    ValidationErrorOut:
       properties:
-        loc:
-          items:
-            anyOf:
-            - type: string
-            - type: integer
-          type: array
-          title: Location
-        msg:
+        detail:
+          description: Описание ошибки на русском языке
+          title: Detail
           type: string
-          title: Message
-        type:
-          type: string
-          title: Error Type
-        input:
-          title: Input
-        ctx:
-          type: object
-          title: Context
-      type: object
+        errors:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/FieldError'
+            type: array
+          - type: 'null'
+          default: null
+          description: Ошибки по полям — только при ошибках формата запроса
+          title: Errors
       required:
-      - loc
-      - msg
-      - type
-      title: ValidationError
+      - detail
+      title: ValidationErrorOut
+      type: object
     Wish:
       properties:
         rank:
