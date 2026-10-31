@@ -71,7 +71,7 @@ curl $API/me/notifications -H "X-User-Id: leader1"
 
 ## Postman-коллекция
 
-[`docs/camp-exchange.postman_collection.json`](docs/camp-exchange.postman_collection.json): 30 запросов с проверками в двух папках — сквозной сценарий цепочки из четырёх человек и отказы с ошибками (401, 403, 409, 422, отказ участника, договорённый обмен). Адрес стенда задан переменной `baseUrl`, номер обмена коллекция берёт из ответа. В Postman: Import → Run collection. Из консоли:
+[`docs/camp-exchange.postman_collection.json`](docs/camp-exchange.postman_collection.json): 31 запрос с проверками в двух папках — сквозной сценарий цепочки из четырёх человек и отказы с ошибками (401, 403, 409, 422, отказ участника, договорённый обмен). Адрес стенда задан переменной `baseUrl`, номер обмена коллекция берёт из ответа. В Postman: Import → Run collection. Из консоли:
 
 ```bash
 npx newman run docs/camp-exchange.postman_collection.json
